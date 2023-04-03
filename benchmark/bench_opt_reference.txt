@@ -1,0 +1,12 @@
+http://optimizizer.com/DMU.php
+Jain, A. S., & Meeran, S. (1999). Deterministic job-shop scheduling: Past, present and future. European journal of operational research, 113(2), 390-434.
+
+설비를 set으로 나누어 선행 set 먼저 수행하고, 후행 set에서 수행하게 하면
+버퍼에 쌓여진 job 개수가 많아져 더 어려운 문제가 됨
+(Fisher H. and Thompson G.L. "Probabilistic learning combinations of local job-shop scheduling rules". Industrial Scheduling, Prentice-Hall, Englewood Cliffs, NJ (1963), pp. 225-251)
+설비 set 개수: k
+
+k=2
+dmu41~dmu80
+swv1~swv15
+harder problems
