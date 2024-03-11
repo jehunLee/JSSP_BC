@@ -1,5 +1,14 @@
 # Job Shop Scheduling Problem (JSSP)
 
+## Main
+- learning target generation
+  - opt\opt_policy_gen.py
+- imitation learning
+  - agent\agent.BC.py
+- performance evaluation
+  - agent\evaluation.py
+  - agent\evaluation_dyn.py
+
 ## Method
 - Entire process for determining an assignment
 ![entire process](./images/entire.png)
