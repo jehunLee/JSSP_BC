@@ -1,5 +1,7 @@
 # Job Shop Scheduling Problem (JSSP)
 
+![](./images/entire.eps)
+
 ## packages
 - CUDA 11.6
   - conda install pytorch==1.12.0 torchvision==0.13.0 torchaudio==0.12.0 cudatoolkit=11.6 -c pytorch -c conda-forge
