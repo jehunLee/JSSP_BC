@@ -2,12 +2,12 @@
 
 ## Main
 - learning target generation
-  - opt\opt_policy_gen.py
+  - opt/opt_policy_gen.py
 - imitation learning
-  - agent\agent.BC.py
+  - agent/agent.BC.py
 - performance evaluation
-  - agent\evaluation.py
-  - agent\evaluation_dyn.py
+  - agent/evaluation.py
+  - agent/evaluation_dyn.py
 
 ## Method
 - Entire process for determining an assignment
