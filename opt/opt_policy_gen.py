@@ -1,367 +1,267 @@
-import copy, os
-from opt.env2 import JobShopGenEnv
+from opt.gen_env import JobShopGenEnv
 from params import configs
+
 import pickle, torch
-from environment import visualize
-from itertools import permutations
-from utils import load_opt_sol
+# from itertools import permutations
+from utils import load_opt_sol, get_opt_data_path
+from collections import defaultdict
 
 
-def get_opt_action_set(env, mcs, opt_sol):
+def remove_assign_pairs(opt_mc_seq: tuple, assign_pairs: list) -> (tuple, list):
+    """
+    repairing optimal mc sequence
+    """
+    no_matching_TF = False
+
+    assign_dict = defaultdict(list)
+    for (mc, job_idx) in assign_pairs:
+        assign_dict[mc].append(job_idx)
+    for mc, job_list in assign_dict.items():
+        for _ in range(len(job_list)):
+            if opt_mc_seq[mc].pop(0) not in job_list:
+                no_matching_TF = True
+                break
+
+    done = True
+    for mc_sol in opt_mc_seq:
+        if mc_sol:
+            done = False
+            break
+
+    return opt_mc_seq, no_matching_TF or done
+
+
+def get_opt_action_set(env: JobShopGenEnv, mcs: list, opt_mc_seq: tuple, op_mask) -> (list, list):
+    """
+    actions at the current time
+    """
     action_set = list()
     assigns = list()
+
     for mc in mcs:
-        job_i = opt_sol[mc][0]
-        a = search_node_index(env, mc, job_i)
-        action_set.append(a)
+        job_i = opt_mc_seq[mc][0]
+        node_i = env.max_mc_n * job_i + env.job_last_step[0, 0, job_i].item()
+        # a = search_node_index(env, mc, job_i)
+
+        # if 'dyn' in configs.env_type:
+        #     a_ = torch.where(env.remain_op_idxs == a)[0].item()
+        # else:
+        #     a_ = a
+        # if op_mask[a_]:
+        #     action_set.append(a)
+        #     assigns.append((mc, job_i))
+
+        action_set.append(node_i)
         assigns.append((mc, job_i))
 
     return action_set, assigns
 
 
-def search_node_index(env, mc, job_i):
-    for node in env.js.node_op_map.keys():
-        if node[0] == mc and node[1] == job_i:
-            return env.js.node_op_map[node]
-    print("none matching node")
-    return -1
+# def search_node_index(env: JobShopGenEnv, mc: int, job_i: int) -> int:
+#     """
+#     search node index
+#     """
+#     for node in env.js.node_op_map.keys():
+#         if node[0] == mc and node[1] == job_i:
+#             return env.js.node_op_map[node]
+#     print("none matching node")
+#     return -1
 
 
-def remove_assign_pairs(opt_sol, assign_pairs):
-    no_matching_TF = False
-    for (mc, job_idx) in assign_pairs:
-        job_i = opt_sol[mc].pop(0)
-        if job_i != job_idx:
-            # print("no matching: mc {}, job_idx {} job_i {}".format(mc, job_idx, job_i))
-            no_matching_TF = True
-            break
-
-    no_opt_sol = True
-    for stage_sol in opt_sol:
-        if stage_sol:
-            no_opt_sol = False
-            break
-
-    return opt_sol, no_matching_TF or no_opt_sol
-
-
-def get_policy(actions, mask):
+def get_policy(actions: list, mask: torch.tensor) -> torch.tensor:
     """
     target policy generation
     """
-    policy = torch.zeros_like(mask).to(torch.float32)
+    policy = torch.zeros(mask.size()[0], dtype=torch.float32)
     for action, (_, _) in actions:
         policy[action] = 1
     return policy / policy.sum()
 
 
-def check_pairs_in_list(new_list, total_list):
-    for (_, remain_pairs) in total_list:
-        if new_list == remain_pairs:
-            return True
-    return False
-
-
-def gen_opt_data(action_set, env, assigns):
+def gen_opt_data(env: JobShopGenEnv, action_set: list, assigns: list) -> list:
+    """
+    generate optimal decision data
+    """
     data = list()
 
     action_pairs = [(action, (mc, job_id)) for action, (mc, job_id) in zip(action_set, assigns)]
-    action_pairs = sorted(action_pairs, key=lambda x: x[1][0])  # mc_idx로 sorting
+    action_pairs = sorted(action_pairs, key=lambda x: x[1][0])  # sorting by mc_idx
 
-    # env_remain_pairs = [(env, action_pairs)]
-
-    def is_all_component_in(test_path, passed_paths):
-        for passed_path in passed_paths:
-            if len(test_path) != len(passed_path):
-                continue
-            component_in_TF = True
-            for comp in test_path:
-                if comp not in passed_path:
-                    component_in_TF = False
-                    break
-            if component_in_TF:
-                return True
-
-        return False
-
-    def is_single_mc_already_search(test_path, passed_paths):
-        for passed_path in passed_paths:
-            if len(test_path) != len(passed_path) or test_path[-1] != passed_path[-1]:
-                continue
-            component_in_TF = True
-            for comp in test_path:
-                if comp not in passed_path:
-                    component_in_TF = False
-                    break
-            if component_in_TF:
-                return True
-
-        return False
-
+    # gen opt data ################################################################
     if not configs.policy_symmetric_TF:
-        env_copy = copy.deepcopy(env)
+        env_copy = JobShopGenEnv(load_envs=[env])
         obs = env_copy.get_obs()
+
         for a, (mc, job_i) in action_pairs:
-            # 하나의 remain action pair를 고려해서 policy 생성
-            env_copy.target_mc = mc
-            policy = get_policy([(a, (mc, job_i))], obs['op'].mask)
+            env_copy.target_mc = torch.zeros(1, 1, env.max_mc_n, dtype=torch.long)
+            env_copy.target_mc[0, 0, mc] = 1
+
+            # if 'dyn' in configs.env_type:
+            # skip때도 발생
+            a_ = torch.where(obs['op_remain'] == a)[0].item()
+            # zero_n = a - obs['op_remain'][:a][-1].item() + 1 - a
+            # a_ = a - zero_n
+            # else:
+            #     a_ = a
+
+            policy = get_policy([(a_, (mc, job_i))], obs.x_dict['op_mask'])
             obs.target_policy = policy
             data.append(obs)
 
             obs, _, _, _, _ = env_copy.step(a)
 
-    else:
-        if not configs.policy_total_mc:
-            all_action_pairs = list(permutations(action_pairs))
-            already_search_paris = list()
-            already_search_remain_paris = list()
-            for action_pairs in all_action_pairs:
-                env_copy = copy.deepcopy(env)
-                obs = env_copy.get_obs()
-                for i, (a, (mc, job_i)) in enumerate(action_pairs):
-                    # 남은 path 가 이미 탐색 했었다면 이미 지난 state 이므로 더이상 탐색 x
-                    # 개수가 4개 이상일 때부터 의미
-                    if action_pairs[i:] in already_search_remain_paris:
-                        break
-
-                    # 하나의 remain action pair를 고려해서 policy 생성
-                    env_copy.target_mc = mc
-
-                    # 지나온 것이 동일하다면, 이미 해당 state 대해서 target policy 가 생성됨
-                    if not is_single_mc_already_search(action_pairs[:i + 1], already_search_paris):
-                        policy = get_policy([(a, (mc, job_i))], obs['op'].mask)
-                        obs.target_policy = policy
-                        data.append(obs)
-                        already_search_remain_paris.append(action_pairs[i:])
-                        already_search_paris.append(action_pairs[:i + 1])
-
-                    obs, _, _, _, _ = env_copy.step(a)
-        else:
-            all_action_pairs = list(permutations(action_pairs))
-            already_search_paris = list()
-            already_search_remain_paris = list()
-            for action_pairs in all_action_pairs:
-                env_copy = copy.deepcopy(env)
-                obs = env_copy.get_obs()
-                for i, (a, (mc, job_i)) in enumerate(action_pairs):
-                    # 남은 path 가 이미 탐색 했었다면 이미 지난 state 이므로 더이상 탐색 x
-                    # 개수가 4개 이상일 때부터 의미
-                    if action_pairs[i:] in already_search_remain_paris:
-                        break
-
-                    # 하나의 remain action pair를 고려해서 policy 생성
-                    env_copy.target_mc = mc
-
-                    # total_mc 에서 지나온 것이 동일하다면, 이미 해당 state 대해서 target policy 가 생성됨
-                    if not is_all_component_in(action_pairs[:i], already_search_paris):
-                        policy = get_policy([(a, (mc, job_i))], obs['op'].mask)
-                        obs.target_policy = policy
-                        data.append(obs)
-                        already_search_remain_paris.append(action_pairs[i:])
-                        already_search_paris.append(action_pairs[:i])
-
-                    obs, _, _, _, _ = env_copy.step(a)
-
-        #
-        #     env_copy = copy.deepcopy(env)
-        #     total_mc_opt_data_gen(env_copy, action_pairs)
-        #
-        #     # 모든 remain action pairs를 고려해서 policy 생성
-        #     obs = env.get_obs()
-        #     policy = get_policy(remain_pairs, obs['op'].mask)
-        #     obs.target_policy = policy
-        #     data.append(obs)
-        #
-        #     # next state 생성
-        #     for (a, (mc, job_i)) in remain_pairs:
-        #         new_remain_pairs = copy.deepcopy(remain_pairs)
-        #         new_remain_pairs.remove((a, (mc, job_i)))
-        #
-        #         if not check_pairs_in_list(new_remain_pairs, new_env_remain_pairs):  # 새로운 state이면 추가
-        #             env_copy = copy.deepcopy(env)
-        #             _, _, _, _, _ = env_copy.step(a)
-        #             new_env_remain_pairs.append((env_copy, new_remain_pairs))
-        #
-        #
-        # # action i+1 개 선택 #######################################
-        # new_env_remain_pairs = list()
-        # for (env, remain_pairs) in env_remain_pairs:
-        #
-        #     # 모든 actions 동시에 고려 #####################################
-        #     if configs.policy_symmetric_TF:
-        #
-        #         # state 별로 하나의 policy 생성 ######
-        #         if configs.policy_total_mc:
-        #             # 모든 remain action pairs를 고려해서 policy 생성
-        #             obs = env.get_obs()
-        #             policy = get_policy(remain_pairs, obs['op'].mask)
-        #             obs.target_policy = policy
-        #             data.append(obs)
-        #
-        #             # next state 생성
-        #             for (a, (mc, job_i)) in remain_pairs:
-        #                 new_remain_pairs = copy.deepcopy(remain_pairs)
-        #                 new_remain_pairs.remove((a, (mc, job_i)))
-        #
-        #                 if not check_pairs_in_list(new_remain_pairs, new_env_remain_pairs):  # 새로운 state이면 추가
-        #                     env_copy = copy.deepcopy(env)
-        #                     _, _, _, _, _ = env_copy.step(a)
-        #                     new_env_remain_pairs.append((env_copy, new_remain_pairs))
-        #
-        #         # edge 별로 하나의 policy 생성 ######
-        #         else:
-        #             for (a, (mc, job_i)) in remain_pairs:
-        #                 env_copy = copy.deepcopy(env)
-        #                 env_copy.target_mc = mc
-        #
-        #                 # 하나의 remain action pair를 고려해서 policy 생성
-        #                 obs = env_copy.get_obs()
-        #                 policy = get_policy([(a, (mc, job_i))], obs['op'].mask)
-        #                 obs.target_policy = policy
-        #                 data.append(obs)
-        #
-        #                 # next state 생성
-        #                 new_remain_pairs = copy.deepcopy(remain_pairs)
-        #                 new_remain_pairs.remove((a, (mc, job_i)))
-        #
-        #                 if not check_pairs_in_list(new_remain_pairs, new_env_remain_pairs):  # 새로운 state이면 추가
-        #                     _, _, _, _, _ = env_copy.step(a)
-        #                     new_env_remain_pairs.append((env_copy, new_remain_pairs))
-
-        # env_remain_pairs = new_env_remain_pairs
-        # end: action i+1 개 선택 #######################################
+    # else:
+    #     def is_all_component_in(test_path, passed_paths):
+    #         for passed_path in passed_paths:
+    #             if len(test_path) != len(passed_path):
+    #                 continue
+    #             if 'single_mc' in configs.action_type:
+    #                 if test_path[-1] != passed_path[-1]:
+    #                     continue
+    #
+    #             component_in_TF = True
+    #             for comp in test_path:
+    #                 if comp not in passed_path:
+    #                     component_in_TF = False  # not in passed_path
+    #                     break
+    #
+    #             if component_in_TF:  # all in passed_path
+    #                 return True
+    #
+    #     all_action_pairs = list(permutations(action_pairs))
+    #     already_search_paris = list()
+    #
+    #     # 2 action_pairs -> 4 (single_mc) or 3 (multiple_mc) states
+    #     # 3 action_pairs -> 12 (single_mc) or 7 (multiple_mc) states
+    #     # 4 action_pairs -> 32 (single_mc) or 15 (multiple_mc) states
+    #     for action_pairs in all_action_pairs:
+    #         env_copy = copy.deepcopy(env)
+    #         obs = env_copy.get_obs()
+    #         for i, (a, (mc, job_i)) in enumerate(action_pairs):
+    #             env_copy.target_mc_i = mc
+    #
+    #             # same passed path -> a target policy is already generated for the state
+    #             if 'single_mc' in configs.action_type:
+    #                 pass_TF = is_all_component_in(action_pairs[:i+1], already_search_paris)
+    #             else:
+    #                 pass_TF = is_all_component_in(action_pairs[:i], already_search_paris)
+    #
+    #             if 'dyn' in configs.env_type:
+    #                 a = torch.where(env_copy.remain_op_idxs == a)[0].item()
+    #
+    #             if not pass_TF:
+    #                 if 'single_mc' in configs.action_type:
+    #                     policy = get_policy([(a, (mc, job_i))], obs.x_dict['op_mask'])
+    #                     already_search_paris.append(action_pairs[:i+1])  # same passed + current mc -> same policy
+    #                 else:
+    #                     policy = get_policy([(torch.where(env_copy.remain_op_idxs == a_)[0].item(), (mc, job_i))
+    #                                           for (a_, (mc, job_i)) in action_pairs[i:]], obs.x_dict['op_mask'])
+    #                     already_search_paris.append(action_pairs[:i])  # same passed -> same policy
+    #
+    #                 obs.target_policy = policy
+    #                 data.append(obs)
+    #
+    #             obs, _, _, _, _ = env_copy.step(a)
 
     return data
 
 
+if __name__ == '__main__':
+    from utils import get_opt_makespan_once, HUN_100, HUN_140, HUN_120, HUN_180, HUN_200, HUN_160, HUN_2, HUN_5, HUN_10, HUN_20, HUN_30, HUN_40, HUN_60, HUN_80, HUN_100
+    from tqdm import tqdm
 
-if __name__ == "__main__":
-    from utils import get_opt_makespan_once, HUN, all_benchmarks
+    configs.agent_type = 'GNN'
+    configs.state_type = 'mc_gap_mc_load_prt_norm'  #, 'mc_gap_mc_load_prt_norm', 'mc_load_norm', 'mc_gap_norm', 'basic_norm', 'simple_norm']  # 'simple_norm', 'basic_norm'
+    configs.sol_type = 'full_active'
+    configs.rollout_type = 'model'
 
-    configs.agent_type = 'rule'
-    configs.env_type = ''  # 'dyn', ''
+    configs.model_type = 'all_pred'
+    configs.env_type = 'dyn'  # dyn
+    configs.policy_symmetric_TF = False  # True, False
+
     ######################################################################################################
-    for configs.action_type in ['single_mc_buffer', 'single_mc_buffer_being', 'conflict', 'single_mc_conflict']:
+    for configs.action_type in ['conflict']:  # action_types   all_buffer_being
+        print(f'\naction: {configs.action_type}\tsol_type: {configs.sol_type} ============================')
+        print(f'state: {configs.state_type}\tsymmetric: {configs.policy_symmetric_TF} ----------')
 
-        for configs.target_sol_type in ['full_active', 'active', '']:  # , 'full_active', 'active', 'active'
+        for problem_set in [HUN_100]:  # , HUN_2]  HUN_60, HUN_40
+            for (benchmark, job_n, mc_n, instances) in problem_set:
+                # benchmark, job_n, mc_n, instances = 'HUN', 6, 4, [121]
+                print(f'{benchmark} {job_n}x{mc_n} -------------')
 
-            print("\n=============", configs.action_set_type, configs.target_sol_type, "============================")
+                # data gen #########################################################################
+                opt_data = list()
+                pass_idxs = list()
+                for instance_i in tqdm(instances):
 
-            save_folder = f'./../opt_policy/{configs.action_set_type} {configs.target_sol_type}'
-            if not os.path.exists(save_folder):
-                os.makedirs(save_folder)
+                    opt_mc_seq, _ = load_opt_sol(benchmark, job_n, mc_n, instance_i, sol_type=configs.sol_type)
+                    if not opt_mc_seq:
+                        continue
 
-            for (benchmark, job_n, mc_n, instance_n) in HUN:
-                problem = str(benchmark) + str(job_n) + "x" + str(mc_n)
-                data_path = './../bench_data/' + benchmark + '/' + problem
+                    opt_makespn = get_opt_makespan_once(benchmark, job_n, mc_n, instance_i)
+                    env = JobShopGenEnv([(benchmark, job_n, mc_n, instance_i)])
 
-                print("\n--------", benchmark, job_n, mc_n, "--------------")
+                    # repeat ######################################################################
+                    obs, reward, done, assign_pairs, mcs = env.reset()  # mcs: mc_conflict_ops.keys()
+                    opt_mc_seq, done2 = remove_assign_pairs(opt_mc_seq, assign_pairs)  # remove assigned jobs
+                    done = done or done2
+                    cum_r = reward
 
-                for configs.state_type in ['simple']:  # 'norm', '', 'add_norm']:  # 'simple', 'add1', 'add2', 'basic'
+                    while not done:
+                        a_set, assigns = get_opt_action_set(env, mcs, opt_mc_seq, obs['op_mask'].x)  # assigns: [(mc, job_i)]
+                        node_i = a_set[0]
+                        if env.op_mask[0, 0, node_i].item() == 0:
+                            cum_r = 0
+                            break
 
-                    for configs.policy_symmetric_TF in [False, True]:  # True, False
+                        # policy gen #################################################
+                        partial_opt_data = gen_opt_data(env, a_set, assigns)
 
-                        opt_data_type = '{} {} {} {}'.format(
-                            configs.env_type, configs.state_type, configs.action_type,
-                            configs.policy_symmetric_TF,
-                        )
+                        # step env #####
+                        total_assign_pairs = list()
+                        for a, (mc, job_i) in zip(a_set, assigns):
 
-                        save_path = save_folder + '/' + opt_data_type
-                        if not os.path.exists(save_path):
-                            os.makedirs(save_path)
-                        save_file = save_path + '/{}.p'.format(problem)
+                            # if 'dyn' in configs.env_type:
+                            #     a = torch.where(env.remain_op_idxs == a)[0].item()
 
-                        # data gen #########################################################################
-                        opt_data = list()
-                        pass_idxs = list()
-                        for instance_i in range(instance_n):
-                            opt_sol = load_opt_sol(benchmark, job_n, mc_n, instance_i,
-                                                   sol_type=configs.target_sol_type)
-                            if not opt_sol:
-                                continue
+                            obs, reward, done, assign_pairs, mcs = env.step(a)
+                            total_assign_pairs += assign_pairs
 
-                            opt_makespn = get_opt_makespan_once(benchmark, job_n, mc_n, instance_i)
-                            env = JobShopGenEnv(benchmark, job_n, mc_n, instance_i)
-
-                            # repeat ##############################################
-                            obs, reward, done, assign_pairs, mcs = env.reset()  # mcs: mc_conflict_ops.keys()
-                            opt_sol, done2 = remove_assign_pairs(opt_sol, assign_pairs)  # 할당된거 제거
+                            # remove assigned operations
+                            opt_mc_seq, done2 = remove_assign_pairs(opt_mc_seq, assign_pairs)
                             done = done or done2
 
+                        # save #######################################################
+                        save_TF = True
+                        if len(set(assigns) & set(total_assign_pairs)) != len(assigns):
+                            print("error: none executed")
+                            save_TF = False
+                            done = True  # end while
+
+                        if save_TF:  # save opt data before error
+                            opt_data += partial_opt_data
                             cum_r = reward
-                            while not done:
-                                a_set, assigns = get_opt_action_set(env, mcs, opt_sol)  # assigns: [(mc, job_i)]
+                        else:
+                            break
 
-                                if configs.policy_total_mc:
-                                    if obs['op'].mask[a_set].sum().item() != len(a_set):
-                                        cum_r = 0
-                                        break
-                                else:
-                                    if obs['op'].mask[a_set].sum().item() != 1:
-                                        cum_r = 0
-                                        break
+                    # check feasibility: different obj -> MDP wrong! ##################
+                    if cum_r == 0 or cum_r == None:
+                        pass_idxs.append(instance_i)
+                    else:
+                        if opt_makespn != -cum_r[0, 0].item():
+                            pass_idxs.append(instance_i)
 
-                                    # action 후보에 없는데 opt_sol에서 action_set으로 뽑힘 -> 종료
-                                    # 설비의 맨 앞에 남은 job_i가 동일한 경우, opt_sol()에서 같이 나올 수 있음
-                                    no_action = False
-                                    for mc, job_i in assigns:
-                                        no_action = True
-                                        for (_, job_i2, _) in env.mc_conflict_ops[mc]:
-                                            if job_i2 == job_i:
-                                                no_action = False
-                                                break
-                                        if no_action:  # action 후보에 없는데 opt_sol에서 action_set으로 뽑힘 -> 종료
-                                            break
-                                    if no_action:  # action 후보에 없는데 opt_sol에서 action_set으로 뽑힘 -> 종료
-                                        break
+                    # complete schedule ####################################
+                    # env.show_gantt_plotly(0, 0)
 
-                                # policy gen #####
-                                # if len(a_set) >= 2:  # 3개: hun 6x3_11 / 2개: hun 4x2_1
-                                #     print('{} actions'.format(len(a_set)))
-                                partial_opt_data = gen_opt_data(a_set, env, assigns)
-                                # if len(a_set) >= 2:
-                                #     print('{} opt data '.format(len(partial_opt_data)))
+                # pass index #########################################################################
+                if len(pass_idxs) > 0:
+                    print(f'pass_num: {len(pass_idxs)}\tidx: {pass_idxs}')
+                #
+                # print(f'opt_data num: {len(opt_data)}')
 
-                                # step env #####
-                                total_assign_pairs = list()
-                                for a, (mc, job_i) in zip(a_set, assigns):
-                                    env.target_mc = mc
-                                    obs, reward, done, assign_pairs, mcs = env.step(a)
-                                    total_assign_pairs += assign_pairs
+                # data save #########################################################################
+                save_file = get_opt_data_path(benchmark, job_n, mc_n, instances)
 
-                                    opt_sol, done2 = remove_assign_pairs(opt_sol, assign_pairs)  # 할당된거 제거
-                                    done = done or done2
-
-                                # 문제 없으면 저장 #####
-                                save_TF = True
-                                if len(set(assigns) & set(total_assign_pairs)) != len(assigns):
-                                    print("error: none executed")
-                                    save_TF = False
-                                    done = True  # while 종료
-
-                                if save_TF:  # 문제 있기 전까지의 data는 저장tqdm
-                                    opt_data += partial_opt_data
-                                    cum_r = reward + configs.gamma * cum_r
-                                else:
-                                    # 지금까지 스케줄
-                                    # visualize.get_gantt_plotly(env)
-                                    break
-
-                            # check feasibility: different obj -> MDP wrong! ##################
-                            if opt_makespn != -cum_r:
-                                pass_idxs.append(instance_i)
-                                # visualize.get_gantt_plotly(env)
-
-                            # 완성 스케줄
-                            visualize.get_gantt_plotly(env)
-
-                        # pass index #########################################################################
-                        if len(pass_idxs) > 0:
-                            print(opt_data_type)
-                            print("pass_num: {}\tidx: {}".format(len(pass_idxs), pass_idxs))
-
-                        print("opt_data num: {}".format(len(opt_data)))
-
-                        # data save #########################################################################
-                        with open(save_file, 'wb') as file:  # wb: binary write mode
-                            pickle.dump(opt_data, file)
+                with open(save_file, 'wb') as file:  # wb: binary write mode
+                    pickle.dump(opt_data, file)

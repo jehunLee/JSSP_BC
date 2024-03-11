@@ -6,15 +6,15 @@ import torch.nn.functional as F
 
 # layer ###################################################################
 def get_GNN_layer():
-    if configs.layer_type == "GAT":
-        return GAT_layer
-    elif configs.layer_type == "GAT2":
-        return GAT2_layer
-    elif configs.layer_type == "GAT2_simple":
+    if 'GAT2_simple' in configs.model_type:
         return GAT2_simple_layer
-    elif configs.layer_type == "node_attn":
+    elif 'GAT2' in configs.model_type:
+        return GAT2_layer
+    elif 'GAT' in configs.model_type:
+        return GAT_layer
+    elif 'node_attn' in configs.model_type:
         return Node_attn
-    elif configs.layer_type == "GCN":
+    elif 'GCN' in configs.model_type:
         return GCN_layer
     else:
         return GCN_layer
@@ -72,8 +72,8 @@ class GAT_layer(nn.Module):
         return self.f_final(h_)  # multi-head concat 후 적용
 
 
-class GAT2_layer(nn.Module):  # ICLR 2022  # HOW ATTENTIVE ARE GRAPH ATTENTION NETWORKS?
-    # e(h_i, h_j) = a LeakyReLU( W [h_i||h_j] ) -> simple version: a LeakyReLU (W h_i + W h_j)
+class GAT2_layer(nn.Module):  # GAT2 - ICLR 2022  # HOW ATTENTIVE ARE GRAPH ATTENTION NETWORKS?
+    # e(h_i, h_j) = a LeakyReLU( W [h_i||h_j] )
     # alpha = softmax(e)
     # h_i' = alpha * W h_j
     def __init__(self, in_dim, out_dim, in_dim_to=1):
@@ -98,12 +98,14 @@ class GAT2_layer(nn.Module):  # ICLR 2022  # HOW ATTENTIVE ARE GRAPH ATTENTION N
         a = torch.stack([A(h_cat_[k]) for k, A in enumerate(self.As)], dim=0)  # (attn_head_n, edge_n, 1)
 
         # softmax -> alpha
-        e = torch.exp(a)  # (attn_head_n, edge_n, 1)
+        if len(a[0]) and a.max() > 80:
+            a = a - a.max() + 70
+        e = torch.exp(a) + 1e-32  # (attn_head_n, edge_n, 1)  # over 80 -> inf, under -100 -> 0
         node_e_sum = torch.zeros(configs.attn_head_n, x_from.shape[0], 1, dtype=e.dtype).to(configs.device)  # (attn_head_n, node_n, 1)
-        src_node = src.view(-1, 1)
-        node_e_sum = torch.stack([node_e_sum[k].scatter_add_(0, src_node, e[k])
+        dst_node = dst.view(-1, 1)
+        node_e_sum = torch.stack([node_e_sum[k].scatter_add_(0, dst_node, e[k])
                                   for k in range(configs.attn_head_n)], dim=0)  # (attn_head_n, node_n, 1)
-        alpha = torch.stack([e[k] / node_e_sum[k][src] for k in range(configs.attn_head_n)], dim=0)  # (attn_head_n, edge_n, 1)
+        alpha = torch.stack([e[k] / node_e_sum[k][dst] for k in range(configs.attn_head_n)], dim=0)  # (attn_head_n, edge_n, 1)
 
         # final
         hs_to = torch.stack([f_init(x_from) for f_init in self.f_inits], dim=0)  # W^k  # (attn_head_n, node_n, em_dim)
@@ -171,7 +173,6 @@ class Node_attn(nn.Module):
 
 #############################################################################################
 def aggr(x_from, edge_index, x_to=None, alpha=1):
-    # if configs.aggr_type == 'sum' or 'mean':
     src, dst = edge_index
     if x_to is None:
         x_to = x_from
@@ -182,7 +183,7 @@ def aggr(x_from, edge_index, x_to=None, alpha=1):
     dsts = torch.cat([dst for _ in range(x_from.shape[1])], dim=1)
     x_ = x_.scatter_add_(0, dsts, x_src)
 
-    if configs.aggr_type == 'mean':
+    if 'GAT' not in configs.model_type and 'mean_aggr' in configs.model_type:
         # normalization ################################
         one_v = torch.ones(dst.shape[0], 1, dtype=x_src.dtype).to(configs.device)
         node_degree = torch.zeros(x_to.shape[0], 1, dtype=one_v.dtype).to(configs.device)
@@ -224,10 +225,10 @@ def get_mlp(in_dim, out_dim, last_act_TF=False):
 
 
 def get_act_f():
-    if configs.act_type == "relu":
-        act_f = nn.ReLU()
-    elif configs.act_type == "leaky_relu":
+    if configs.act_type == "leaky_relu":
         act_f = nn.LeakyReLU()
+    elif configs.act_type == "relu":
+        act_f = nn.ReLU()
     elif configs.act_type == "tanh":  # xavier init
         act_f = nn.Tanh()
     elif configs.act_type == 'sigmoid':
@@ -255,6 +256,8 @@ def get_loss_f():
         loss_f = nn.SmoothL1Loss()
     elif configs.loss_type == "MSE":
         loss_f = nn.MSELoss()
+    elif configs.loss_type == "MAE":
+        loss_f = nn.L1Loss()
     elif configs.loss_type == "CE":
         loss_f = nn.CrossEntropyLoss()
     else:

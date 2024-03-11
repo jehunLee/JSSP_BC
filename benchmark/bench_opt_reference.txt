@@ -10,3 +10,18 @@ k=2
 dmu41~dmu80
 swv1~swv15
 harder problems
+
+
+
+_____________________________________
+instance data
+
+http://optimizizer.com/DMU.php
+https://github.com/tamy0612/JSPLIB
+https://github.com/ptal/kobe-scheduling/tree/master/data
+
+
+예외 처리:
+ORB07: 
+10-th operation of job 10
+processing time 0 -> 1

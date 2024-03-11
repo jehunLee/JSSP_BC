@@ -3,14 +3,14 @@
 import collections
 from ortools.sat.python import cp_model
 import csv
-from utils import all_benchmarks, load_data
+from utils import load_data
 import os
 from tqdm import tqdm
 from collections import defaultdict
 
 
 def JSSP_solver(benchmark: str, job_n: int, mc_n: int, instance_i: int, time_limit: int=3600,
-                save_path: str=None) -> (int, int):
+                save_path: str=None, obj_type: str='makespan') -> (int, int):
     # Creates the model.
     model = cp_model.CpModel()
 
@@ -43,11 +43,22 @@ def JSSP_solver(benchmark: str, job_n: int, mc_n: int, instance_i: int, time_lim
         for j in range(len(job_mcs[i]) - 1):
             model.Add(all_tasks[(i, j+1)].start >= all_tasks[(i, j)].end)
 
-    # Makespan objective.
-    obj_var = model.NewIntVar(0, horizon, 'makespan')
-    model.AddMaxEquality(obj_var, [all_tasks[(i, len(job_mcs[i])-1)].end for i in all_jobs])
+    # objective.
+    if obj_type == 'makespan':
+        obj_var = model.NewIntVar(0, horizon, 'makespan')
+        model.AddMaxEquality(obj_var, [all_tasks[(i, len(job_mcs[i])-1)].end for i in all_jobs])
+        model.Minimize(obj_var)
 
-    model.Minimize(obj_var)
+    elif obj_type == 'total_completion':
+        horizon_ = horizon * job_n
+
+        obj_var = model.NewIntVar(0, horizon_, 'total_completion')
+        model.Add(obj_var == sum(all_tasks[(i, len(job_mcs[i])-1)].end for i in all_jobs))
+        model.Minimize(obj_var)
+
+    else:
+        obj_var = None
+        NotImplementedError()
 
     # Solve model.
     solver = cp_model.CpSolver()
@@ -81,16 +92,21 @@ def JSSP_solver(benchmark: str, job_n: int, mc_n: int, instance_i: int, time_lim
                 his_mc_job_op_i[mc_i].append(j)
                 mc_tuple[mc_i].append((i, solver.Value(all_tasks[i, j].start)))
 
-        solution_save(benchmark, job_n, mc_n, instance_i, mc_tuple, obj_v)
+        solution_save(benchmark, job_n, mc_n, instance_i, mc_tuple, obj_v, obj_type)
 
     return status, obj_v
 
 
-def solution_save(benchmark: str, job_n: int, mc_n: int, instance_i: int, mc_tuple: dict, obj: int) -> None:
+def solution_save(benchmark: str, job_n: int, mc_n: int, instance_i: int, mc_tuple: dict, obj: int,
+                  obj_type: str='makespan') -> None:
     problem = f'{benchmark}{job_n}x{mc_n}'
     folder_path = f'./../benchmark/{benchmark}/{problem}'
     if not os.path.isdir(folder_path):
         folder_path = f'./benchmark/{benchmark}/{problem}'
+
+    # folder_path = folder_path + f'/{obj_type}'
+    # if not os.path.isdir(folder_path):
+    #     os.mkdir(folder_path)
 
     with open(folder_path + f'/opt_{instance_i}.csv', 'w', newline='') as f:
         wr = csv.writer(f)
@@ -114,11 +130,16 @@ def result_save(save_path: str, benchmark: str, job_n: int, mc_n: int, instance_
 
 
 if __name__ == "__main__":
-    # save_path = None
-    save_path = './../result/bench_cp.csv'
-    for time_limit in [10, 60]:  # 1, 10, 60, 300, 3600
-        for (benchmark, job_n, mc_n, save_i_n) in all_benchmarks:
+    from utils import all_benchmarks
+    save_path = None
+    obj_type = 'total_completion'
+    # save_path = './../result/bench_cp.csv'
+    for time_limit in [3600]:  # 1, 10, 60, 300, 3600
+        for (benchmark, job_n, mc_n, save_is) in [('HUN', 6, 4, list(range(300))), ('HUN', 6, 6, list(range(300))),
+                                                   ('HUN', 8, 4, list(range(300))), ('HUN', 8, 6, list(range(300)))]:
+        # for (benchmark, job_n, mc_n, save_i_n) in all_benchmarks:
             print(benchmark, job_n, mc_n)
 
-            for instance_i in tqdm(range(save_i_n)):
-                _, _ = JSSP_solver(benchmark, job_n, mc_n, instance_i, time_limit, save_path=save_path)
+            for instance_i in tqdm(save_is):
+                _, _ = JSSP_solver(benchmark, job_n, mc_n, instance_i, time_limit, save_path=save_path,
+                                   obj_type=obj_type)
