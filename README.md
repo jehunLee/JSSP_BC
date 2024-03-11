@@ -3,8 +3,10 @@
 ## Main
 - learning target generation
   - opt/opt_policy_gen.py
+  
 - imitation learning
   - agent/agent.BC.py
+ 
 - performance evaluation
   - agent/evaluation.py
   - agent/evaluation_dyn.py
@@ -25,9 +27,6 @@
   - conda install pytorch==1.12.0 torchvision==0.13.0 torchaudio==0.12.0 cudatoolkit=11.6 -c pytorch -c conda-forge
 - torch geometric 2.1.0
   - conda install pyg -c pyg
-
-- networkx 2.8.4
-  - conda install networkx
   
 - ortools 9.6.2534
   - pip install ortools
