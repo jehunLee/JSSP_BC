@@ -1,6 +1,6 @@
 # Job Shop Scheduling Problem (JSSP)
 
-![a](./images/entire.png)
+![entire process](./images/entire.png)
 
 ## packages
 - CUDA 11.6
