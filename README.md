@@ -1,8 +1,17 @@
 # Job Shop Scheduling Problem (JSSP)
 
+## Method
+- Entire process for determining an assignment
 ![entire process](./images/entire.png)
 
-## packages
+- Graph attention network(GAT) structure to compute the selection probability of each node 
+![GAT structure](./images/GAT.png)
+
+- Sequential decision process with multiple transitions 
+![transition](./images/transition.png)
+
+
+## Packages
 - CUDA 11.6
   - conda install pytorch==1.12.0 torchvision==0.13.0 torchaudio==0.12.0 cudatoolkit=11.6 -c pytorch -c conda-forge
 - torch geometric 2.1.0
