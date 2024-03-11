@@ -14,7 +14,7 @@
 
 ## Method
 - Entire process for determining an assignment
-![entire process](./images/entire.png width="200" height="400")
+![entire process](./images/entire.png width="200")
 
 - Graph attention network(GAT) structure to compute the selection probability of each node 
 ![GAT structure](./images/GAT.png)
