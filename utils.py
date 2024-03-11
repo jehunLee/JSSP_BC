@@ -3,158 +3,6 @@ from params import configs
 import pickle
 
 
-class Job:
-    def __init__(self, id: int, mcs: list, prts: list, arrival_t: int=0, due: int=0):
-        self.id = id
-        self.mcs = mcs  # route
-        self.prts = prts  # processing times
-        self.arrival_t = arrival_t
-        self.due = due
-
-
-# total 242 instances ####################################################################################
-TA = [['TA', 15, 15, list(range(10))],
-      ['TA', 20, 15, list(range(10))], ['TA', 20, 20, list(range(10))],
-      ['TA', 30, 15, list(range(10))], ['TA', 30, 20, list(range(10))],
-      ['TA', 50, 15, list(range(10))], ['TA', 50, 20, list(range(10))],
-      ['TA', 100, 20, list(range(10))], ]  # 80
-TA_small = [['TA', 15, 15, list(range(10))],
-      ['TA', 20, 15, list(range(10))], ['TA', 20, 20, list(range(10))],
-      ['TA', 30, 15, list(range(10))], ['TA', 30, 20, list(range(10))], ]
-LA = [['LA', 10, 5, list(range(5))], ['LA', 15, 5, list(range(5))], ['LA', 20, 5, list(range(5))],
-      ['LA', 10, 10, list(range(5))], ['LA', 15, 10, list(range(5))], ['LA', 20, 10, list(range(5))],
-      ['LA', 30, 10, list(range(5))], ['LA', 15, 15, list(range(5))], ]  # 40
-DMU = [['DMU', 20, 15, list(range(10))], ['DMU', 20, 20, list(range(10))],
-       ['DMU', 30, 15, list(range(10))], ['DMU', 30, 20, list(range(10))],
-       ['DMU', 40, 15, list(range(10))], ['DMU', 40, 20, list(range(10))],
-       ['DMU', 50, 15, list(range(10))], ['DMU', 50, 20, list(range(10))], ]  # 80
-SWV = [['SWV', 20, 10, list(range(5))], ['SWV', 20, 15, list(range(5))], ['SWV', 50, 10, list(range(10))], ]  # 20
-ABZ = [['ABZ', 10, 10, list(range(2))], ['ABZ', 20, 15, list(range(3))], ]  # 5
-ORB = [['ORB', 10, 10, list(range(10))], ]  # 10
-YN = [['YN', 20, 20, list(range(4))]]  # 4
-FT = [['FT', 6, 6, list(range(1))], ['FT', 10, 10, list(range(1))], ['FT', 20, 5, list(range(1))], ]  # 3
-
-
-all_benchmarks = TA + LA + ABZ + FT + ORB + SWV + YN + DMU
-
-
-# total 242 instances ####################################################################################
-TA_dyn = [
-      ['TA', 50, 15, list(range(10)), 2800], ['TA', 50, 20, list(range(10)), 2800],
-      ['TA', 100, 20, list(range(10)), 5400], ]  # 30
-LA_dyn = [['LA', 15, 5, list(range(5)), 900], ['LA', 20, 5, list(range(5)), 1200],
-      ['LA', 30, 10, list(range(5)), 1800], ]  # 15
-DMU_dyn = [
-       ['DMU', 40, 15, list(range(5)), 4500],
-       ['DMU', 50, 15, list(range(5)), 5700], ['DMU', 50, 20, list(range(5)), 5700],
-           ['DMU', 40, 15, list(range(5, 10)), 5200],
-           ['DMU', 50, 15, list(range(5, 10)), 6200], ['DMU', 50, 20, list(range(5, 10)), 6800],
-           ]  # 30
-SWV_dyn = [['SWV', 50, 10, list(range(10)), 2900], ]  # 10
-
-TA_dyn = [['TA', 50, 15, list(range(10))], ['TA', 50, 20, list(range(10))], ['TA', 100, 20, list(range(10))]]  # 30
-LA_dyn = [['LA', 15, 5, list(range(5))], ['LA', 20, 5, list(range(5))], ['LA', 30, 10, list(range(5))]]  # 15
-DMU_dyn = [['DMU', 40, 15, list(range(5))], ['DMU', 50, 15, list(range(5))], ['DMU', 50, 20, list(range(5))],
-           ['DMU', 40, 15, list(range(5, 10))], ['DMU', 50, 15, list(range(5, 10))], ['DMU', 50, 20, list(range(5, 10))],
-           ]  # 30
-SWV_dyn = [['SWV', 50, 10, list(range(10))]]  # 10
-FT_dyn = [['FT', 20, 5, list(range(1))]]  # 10
-
-all_dyn_benchmarks = DMU_dyn + TA_dyn + LA_dyn + SWV_dyn + FT_dyn
-
-# REAL = [['REAL', 100, 100, list(range(40))], ['REAL', 1000, 100, list(range(40))], ['REAL', 1000, 1000, list(range(40))]]  # 30
-REAL = [['REAL', 100, 20, list(range(40))], ['REAL', 100, 50, list(range(40))],
-        ['REAL', 300, 20, list(range(40))], ['REAL', 300, 50, list(range(40))]]
-REAL_D = [['REAL_D', 200, 20, list(range(10))], ['REAL_D', 300, 20, list(range(10))]]
-REAL_D2 = [['REAL_D', 200, 20, list(range(10, 40))], ['REAL_D', 300, 20, list(range(10, 40))]]
-
-
-FLOW = [['FLOW', 10, 5, list(range(10))], ['FLOW', 10, 10, list(range(10))],
-        ['FLOW', 20, 5, list(range(10))], ['FLOW', 20, 10, list(range(10))],
-        ['FLOW', 50, 5, list(range(10))], ['FLOW', 50, 10, list(range(10))]]
-
-# total 800 instances ####################################################################################
-HUN_40 = [['HUN', 6, 4, list(range(200))], ['HUN', 6, 6, list(range(200))],
-       ['HUN', 8, 4, list(range(200))], ['HUN', 8, 6, list(range(200))], ]  # 800
-
-HUN_40_2 = [['HUN', 6, 4, list(range(200, 400))], ['HUN', 6, 6, list(range(200, 400))],
-        ['HUN', 8, 4, list(range(200, 400))], ['HUN', 8, 6, list(range(200, 400))], ]  # 800
-
-list_30 = [i for i in range(200) if i % 40 < 30]
-HUN_30 = [['HUN', 6, 4, list_30], ['HUN', 6, 6, list_30],
-       ['HUN', 8, 4, list_30], ['HUN', 8, 6, list_30], ]  # 600
-
-list_20 = [i for i in range(200) if i % 40 < 20]
-HUN_20 = [['HUN', 6, 4, list_20], ['HUN', 6, 6, list_20],
-       ['HUN', 8, 4, list_20], ['HUN', 8, 6, list_20], ]  # 400
-
-list_10 = [i for i in range(200) if i % 40 < 10]
-HUN_10 = [['HUN', 6, 4, list_10], ['HUN', 6, 6, list_10],
-       ['HUN', 8, 4, list_10], ['HUN', 8, 6, list_10], ]  # 200
-
-list_5 = [i for i in range(200) if i % 40 < 5]
-HUN_5 = [['HUN', 6, 4, list_5], ['HUN', 6, 6, list_5],
-       ['HUN', 8, 4, list_5], ['HUN', 8, 6, list_5], ]  # 100
-
-list_2 = [i for i in range(200) if i % 40 < 2]
-HUN_2 = [['HUN', 6, 4, list_2], ['HUN', 6, 6, list_2],
-       ['HUN', 8, 4, list_2], ['HUN', 8, 6, list_2], ]  # 40
-
-list_1 = [i for i in range(200) if i % 40 < 1]
-HUN_1 = [['HUN', 6, 4, list_1], ['HUN', 6, 6, list_1],
-         ['HUN', 8, 4, list_1], ['HUN', 8, 6, list_1], ]  # 40
-
-list_60 = list(range(200)) + [i for i in range(200, 400) if i % 40 < 20]
-HUN_60 = [['HUN', 6, 4, list_60], ['HUN', 6, 6, list_60],
-       ['HUN', 8, 4, list_60], ['HUN', 8, 6, list_60], ]  # 300
-
-list_80 = list(range(400))
-HUN_80 = [['HUN', 6, 4, list_80], ['HUN', 6, 6, list_80],
-          ['HUN', 8, 4, list_80], ['HUN', 8, 6, list_80], ]  # 400
-
-list_100 = list(range(400)) + [i for i in range(400, 600) if i % 40 < 20]
-HUN_100 = [['HUN', 6, 4, list_100], ['HUN', 6, 6, list_100],
-          ['HUN', 8, 4, list_100], ['HUN', 8, 6, list_100], ]  # 500
-
-# HUN_40_3 = [['HUN', 6, 4, list(range(400, 600))], ['HUN', 6, 6, list(range(400, 600))],
-#         ['HUN', 8, 4, list(range(400, 600))], ['HUN', 8, 6, list(range(400, 600))], ]  # 800
-
-list_120 = list(range(600))
-HUN_120 = [['HUN', 6, 4, list_120], ['HUN', 6, 6, list_120],
-          ['HUN', 8, 4, list_120], ['HUN', 8, 6, list_120], ]  # 600
-
-list_140 = list(range(600)) + [i for i in range(600, 800) if i % 40 < 20]
-HUN_140 = [['HUN', 6, 4, list_140], ['HUN', 6, 6, list_140],
-          ['HUN', 8, 4, list_140], ['HUN', 8, 6, list_140], ]  # 700
-
-list_160 = list(range(800))
-HUN_160 = [['HUN', 6, 4, list_160], ['HUN', 6, 6, list_160],
-          ['HUN', 8, 4, list_160], ['HUN', 8, 6, list_160], ]  # 800
-
-list_180 = list(range(800)) + [i for i in range(800, 1000) if i % 40 < 20]
-HUN_180 = [['HUN', 6, 4, list_180], ['HUN', 6, 6, list_180],
-          ['HUN', 8, 4, list_180], ['HUN', 8, 6, list_180], ]  # 900
-
-list_200 = list(range(1000))
-HUN_200 = [['HUN', 6, 4, list_200], ['HUN', 6, 6, list_200],
-          ['HUN', 8, 4, list_200], ['HUN', 8, 6, list_200], ]  # 1000
-
-list_200 = list(range(600, 1000))
-HUN_2002 = [['HUN', 6, 4, list_200], ['HUN', 6, 6, list_200],
-          ['HUN', 8, 4, list_200], ['HUN', 8, 6, list_200], ]  # 1000
-
-# dispatching rules ######################################################################################
-# all_rules = ['LTT', 'MOR', 'FDD/MWKR', 'LRPT', 'SPT', 'STT', 'SRPT', 'LOR', 'LPT']
-# all_rules = ['LTT', 'MOR', 'FDD/MWKR']
-all_rules = ['LTT', 'MOR', 'FDD/MWKR', 'LRPT', 'SPT']
-# all_rules = ['STT', 'SRPT', 'LOR', 'LPT']
-
-
-# parameters #############################################################################################
-# action_types = ['single_mc_conflict', 'conflict', 'single_mc_buffer', 'single_mc_buffer_being']
-action_types = ['single_mc_buffer']
-
-
 # load data ##############################################################################################
 def load_data(benchmark: str, job_n: int, mc_n: int, instance_i: int) -> (list, list):
     problem = f'{benchmark}{job_n}x{mc_n}'
@@ -247,6 +95,7 @@ def get_opt_data_path(benchmark: str, job_n: int, mc_n: int, instances: list) ->
     save_folder = f'./../opt_policy/{configs.action_type}__{configs.sol_type}'
     # if 'diff_disj_all_pred' in configs.model_type:
     #     save_folder = f'{save_folder}__diff_disj_all_pred'
+
     if 'all_pred' in configs.model_type:
         save_folder = f'{save_folder}__all_pred'
     else:
@@ -563,3 +412,117 @@ def get_env(problem_set: list, pomo_n: int=1):
 
     return JobShopEnv(env_list, pomo_n=pomo_n)
 
+
+# total 242 instances ####################################################################################
+TA = [['TA', 15, 15, list(range(10))],
+      ['TA', 20, 15, list(range(10))], ['TA', 20, 20, list(range(10))],
+      ['TA', 30, 15, list(range(10))], ['TA', 30, 20, list(range(10))],
+      ['TA', 50, 15, list(range(10))], ['TA', 50, 20, list(range(10))],
+      ['TA', 100, 20, list(range(10))], ]  # 80
+TA_small = [['TA', 15, 15, list(range(10))],
+      ['TA', 20, 15, list(range(10))], ['TA', 20, 20, list(range(10))],
+      ['TA', 30, 15, list(range(10))], ['TA', 30, 20, list(range(10))], ]
+LA = [['LA', 10, 5, list(range(5))], ['LA', 15, 5, list(range(5))], ['LA', 20, 5, list(range(5))],
+      ['LA', 10, 10, list(range(5))], ['LA', 15, 10, list(range(5))], ['LA', 20, 10, list(range(5))],
+      ['LA', 30, 10, list(range(5))], ['LA', 15, 15, list(range(5))], ]  # 40
+DMU = [['DMU', 20, 15, list(range(10))], ['DMU', 20, 20, list(range(10))],
+       ['DMU', 30, 15, list(range(10))], ['DMU', 30, 20, list(range(10))],
+       ['DMU', 40, 15, list(range(10))], ['DMU', 40, 20, list(range(10))],
+       ['DMU', 50, 15, list(range(10))], ['DMU', 50, 20, list(range(10))], ]  # 80
+SWV = [['SWV', 20, 10, list(range(5))], ['SWV', 20, 15, list(range(5))], ['SWV', 50, 10, list(range(10))], ]  # 20
+ABZ = [['ABZ', 10, 10, list(range(2))], ['ABZ', 20, 15, list(range(3))], ]  # 5
+ORB = [['ORB', 10, 10, list(range(10))], ]  # 10
+YN = [['YN', 20, 20, list(range(4))]]  # 4
+FT = [['FT', 6, 6, list(range(1))], ['FT', 10, 10, list(range(1))], ['FT', 20, 5, list(range(1))], ]  # 3
+
+
+all_benchmarks = TA + LA + ABZ + FT + ORB + SWV + YN + DMU
+
+
+# total 86 instances ####################################################################################
+TA_dyn = [['TA', 50, 15, list(range(10))], ['TA', 50, 20, list(range(10))], ['TA', 100, 20, list(range(10))]]  # 30
+LA_dyn = [['LA', 15, 5, list(range(5))], ['LA', 20, 5, list(range(5))], ['LA', 30, 10, list(range(5))]]  # 15
+DMU_dyn = [['DMU', 40, 15, list(range(5))], ['DMU', 50, 15, list(range(5))], ['DMU', 50, 20, list(range(5))],
+           ['DMU', 40, 15, list(range(5, 10))], ['DMU', 50, 15, list(range(5, 10))], ['DMU', 50, 20, list(range(5, 10))],
+           ]  # 30
+SWV_dyn = [['SWV', 50, 10, list(range(10))]]  # 10
+FT_dyn = [['FT', 20, 5, list(range(1))]]  # 1
+
+all_dyn_benchmarks = DMU_dyn + TA_dyn + LA_dyn + SWV_dyn + FT_dyn
+
+# real distribution ####################################################################################
+REAL = [['REAL', 100, 20, list(range(40))], ['REAL', 100, 50, list(range(40))],
+        ['REAL', 300, 20, list(range(40))], ['REAL', 300, 50, list(range(40))]]
+REAL_D = [['REAL_D', 200, 20, list(range(10))], ['REAL_D', 300, 20, list(range(10))]]
+REAL_D2 = [['REAL_D', 200, 20, list(range(10, 40))], ['REAL_D', 300, 20, list(range(10, 40))]]
+
+FLOW = [['FLOW', 10, 5, list(range(10))], ['FLOW', 10, 10, list(range(10))],
+        ['FLOW', 20, 5, list(range(10))], ['FLOW', 20, 10, list(range(10))],
+        ['FLOW', 50, 5, list(range(10))], ['FLOW', 50, 10, list(range(10))]]
+
+# total 800 instances ####################################################################################
+HUN_40 = [['HUN', 6, 4, list(range(200))], ['HUN', 6, 6, list(range(200))],
+       ['HUN', 8, 4, list(range(200))], ['HUN', 8, 6, list(range(200))], ]  # 800
+
+list_30 = [i for i in range(200) if i % 40 < 30]
+HUN_30 = [['HUN', 6, 4, list_30], ['HUN', 6, 6, list_30],
+       ['HUN', 8, 4, list_30], ['HUN', 8, 6, list_30], ]  # 600
+
+list_20 = [i for i in range(200) if i % 40 < 20]
+HUN_20 = [['HUN', 6, 4, list_20], ['HUN', 6, 6, list_20],
+       ['HUN', 8, 4, list_20], ['HUN', 8, 6, list_20], ]  # 400
+
+list_10 = [i for i in range(200) if i % 40 < 10]
+HUN_10 = [['HUN', 6, 4, list_10], ['HUN', 6, 6, list_10],
+       ['HUN', 8, 4, list_10], ['HUN', 8, 6, list_10], ]  # 200
+
+list_5 = [i for i in range(200) if i % 40 < 5]
+HUN_5 = [['HUN', 6, 4, list_5], ['HUN', 6, 6, list_5],
+       ['HUN', 8, 4, list_5], ['HUN', 8, 6, list_5], ]  # 100
+
+list_2 = [i for i in range(200) if i % 40 < 2]
+HUN_2 = [['HUN', 6, 4, list_2], ['HUN', 6, 6, list_2],
+       ['HUN', 8, 4, list_2], ['HUN', 8, 6, list_2], ]  # 40
+
+list_1 = [i for i in range(200) if i % 40 < 1]
+HUN_1 = [['HUN', 6, 4, list_1], ['HUN', 6, 6, list_1],
+         ['HUN', 8, 4, list_1], ['HUN', 8, 6, list_1], ]  # 40
+
+list_60 = list(range(200)) + [i for i in range(200, 400) if i % 40 < 20]
+HUN_60 = [['HUN', 6, 4, list_60], ['HUN', 6, 6, list_60],
+       ['HUN', 8, 4, list_60], ['HUN', 8, 6, list_60], ]  # 300
+
+list_80 = list(range(400))
+HUN_80 = [['HUN', 6, 4, list_80], ['HUN', 6, 6, list_80],
+          ['HUN', 8, 4, list_80], ['HUN', 8, 6, list_80], ]  # 400
+
+list_100 = list(range(400)) + [i for i in range(400, 600) if i % 40 < 20]
+HUN_100 = [['HUN', 6, 4, list_100], ['HUN', 6, 6, list_100],
+          ['HUN', 8, 4, list_100], ['HUN', 8, 6, list_100], ]  # 500
+
+list_120 = list(range(600))
+HUN_120 = [['HUN', 6, 4, list_120], ['HUN', 6, 6, list_120],
+          ['HUN', 8, 4, list_120], ['HUN', 8, 6, list_120], ]  # 600
+
+list_140 = list(range(600)) + [i for i in range(600, 800) if i % 40 < 20]
+HUN_140 = [['HUN', 6, 4, list_140], ['HUN', 6, 6, list_140],
+          ['HUN', 8, 4, list_140], ['HUN', 8, 6, list_140], ]  # 700
+
+list_160 = list(range(800))
+HUN_160 = [['HUN', 6, 4, list_160], ['HUN', 6, 6, list_160],
+          ['HUN', 8, 4, list_160], ['HUN', 8, 6, list_160], ]  # 800
+
+list_180 = list(range(800)) + [i for i in range(800, 1000) if i % 40 < 20]
+HUN_180 = [['HUN', 6, 4, list_180], ['HUN', 6, 6, list_180],
+          ['HUN', 8, 4, list_180], ['HUN', 8, 6, list_180], ]  # 900
+
+list_200 = list(range(1000))
+HUN_200 = [['HUN', 6, 4, list_200], ['HUN', 6, 6, list_200],
+          ['HUN', 8, 4, list_200], ['HUN', 8, 6, list_200], ]  # 1000
+
+# dispatching rules ######################################################################################
+# all_rules = ['LTT', 'MOR', 'FDD/MWKR', 'LRPT', 'SPT', 'STT', 'SRPT', 'LOR', 'LPT']
+all_rules = ['LTT', 'MOR', 'FDD/MWKR', 'LRPT', 'SPT']
+
+# action_types = ['conflict', 'buffer', 'buffer_being']
+action_types = ['conflict', 'buffer']

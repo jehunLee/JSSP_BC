@@ -88,7 +88,7 @@ class AgentBC(AgentGNN):
 
 
 if __name__ == '__main__':
-    from utils import HUN_1, HUN_140, HUN_2, HUN_5, HUN_10, HUN_20, HUN_30, HUN_40, HUN_60, HUN_100
+    from utils import HUN_1
 
     configs.agent_type = 'GNN_BC_policy'
     configs.env_type = 'dyn'  # 'dyn', ''
@@ -98,7 +98,7 @@ if __name__ == '__main__':
 
     valid_problem_set = [('TA', 15, 15, list(range(10)))]
 
-    for data_set in [HUN_100]:  # HUN_2, HUN_5, HUN_10, HUN_20, HUN_30, HUN_40,
+    for data_set in [HUN_1]:  # HUN_2, HUN_5, HUN_10, HUN_20, HUN_30, HUN_40,
         configs.training_len = len(data_set[0][3])
 
         for configs.action_type in ['conflict']:  # action_types ['single_mc_conflict', 'conflict', 'buffer_being', 'single_mc_buffer', 'single_mc_buffer_being']

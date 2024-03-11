@@ -2,7 +2,6 @@ from opt.gen_env import JobShopGenEnv
 from params import configs
 
 import pickle, torch
-# from itertools import permutations
 from utils import load_opt_sol, get_opt_data_path
 from collections import defaultdict
 

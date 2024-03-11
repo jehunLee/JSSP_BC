@@ -5,7 +5,7 @@ import pickle, torch, os, time
 
 from torch.distributions import Categorical
 from utils import get_x_dim
-from network import GNN, Hetero_GNN_type_aware_all_pred, Hetero_GNN_type_aware  #, Hetero_GNN_type_aware_all_pred_multi_ouput
+from network import GNN, Hetero_GNN_type_aware_all_pred, Hetero_GNN_type_aware
 
 
 class AgentGNN():
@@ -283,8 +283,6 @@ class AgentGNN():
         from environment.env import JobShopEnv
         from environment.dyn_env import JobShopDynEnv
 
-        # from utils import get_env
-
         self.model_load()
         self.model.to(configs.device)
         for (benchmark, job_n, mc_n, instances) in benchmarks:
@@ -312,12 +310,6 @@ class AgentGNN():
 
             print(round(mean_r/len(instances), 2))
             # mean_r = round(mean_r/len(instances), 2)
-            #
-            # env_valid = get_env([(benchmark, job_n, mc_n, instances)], pomo_n=1)
-            # mean_cum_r, mean_run_t, _ = self.run_episode_model_once(env_valid, test_TF=True)
-            #
-            # if -mean_r * len(instances) != mean_cum_r.sum().item():
-            #     print()
 
     # etc function for learning #######################################################################
     def save_training_process(self, valids: list, losses: list) -> None:
@@ -368,26 +360,18 @@ class AgentGNN():
 
 
 if __name__ == '__main__':
-    from utils import all_benchmarks, HUN_60
+    from utils import all_benchmarks, HUN_100
 
     configs.agent_type = 'GNN_BC_policy'
     configs.env_type = 'dyn'  # 'dyn', ''
     configs.state_type = 'mc_gap_mc_load_prt_norm'  # 'basic_norm', 'simple_norm', 'norm', 'mc_load_norm'
     configs.model_type = 'type_all_pred_GAT2'  # 'type_all_pred_GAT2'
 
-    configs.training_len = len(HUN_60[0][3])
+    configs.training_len = len(HUN_100[0][3])
 
-
-    for configs.action_type in ['single_mc_conflict']:
+    for configs.action_type in ['conflict']:
         for i in range(5):
             agent = AgentGNN(model_i=i)
 
             save_path = f'./../result/bench_model_{i}.csv'
             agent.perform_model_benchmarks(all_benchmarks, save_path=save_path)
-            # agent.perform_model_benchmarks([('HUN', 6, 6, [0])], save_path=save_path)
-
-            # HUN 4x3_0: 84, 84, 84, 84, 84
-            # HUN 6x6_0: 168, 171, 173, 185, 168
-            # HUN 6x6_1: 195, 184, 195, 190, 167
-            # HUN 8x6_0: 164, 179, 177, 177, 164
-            # TA 15x15_0: 1498, 1434, 1397, 1385, 1386
