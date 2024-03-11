@@ -18,10 +18,10 @@
 <img src = ./images/entire.png width=80%>
 
 - Graph attention network(GAT) structure to compute the selection probability of each node 
-<img src = ./images/GAT width=80%>
+<img src = ./images/GAT.png width=80%>
 
 - Sequential decision process with multiple transitions 
-<img src = ./images/transition width=80%>
+<img src = ./images/transition.png width=80%>
 
 
 ## Packages
