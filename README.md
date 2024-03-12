@@ -45,3 +45,5 @@
 - pickle 1.0.2
   - pip install pickle-mixin
     
+- networkx 2.8.4
+  - conda install networkx
