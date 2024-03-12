@@ -12,19 +12,15 @@ configs.agent_type = 'GNN_BC_policy'
 # configs.dyn_type = 'mc_breakdown_known'
 # parameters = [100, 200, 300, 400]
 
-# configs.dyn_type = 'job_arrival'
-# parameters = [100, 200, 300, 400]
-# configs.init_batch = 2
+configs.dyn_type = 'job_arrival'
+parameters = [100, 200, 300, 400]
+configs.init_batch = 2
 
-configs.dyn_type = 'prt_stochastic_known'
-parameters = [0.1, 0.2, 0.3, 0.4]
+# configs.dyn_type = 'prt_stochastic_known'
+# parameters = [0.1, 0.2, 0.3, 0.4]
 
 # test_set = all_dyn_benchmarks
 test_set = all_benchmarks
-
-# configs.dyn_type = 'prt_stochastic'
-# parameters = [0.1, 0.2, 0.3, 0.4]
-# configs.parameter = 0.4
 
 save_folder = f'./../result/{configs.dyn_type}/'
 if not os.path.exists(save_folder):

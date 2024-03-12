@@ -32,7 +32,7 @@ class JobShopEnv:
             self.load_problems(problems)
             self.init_index()
 
-        UB = self.init_job_durations.max() * self.max_mc_n * self.max_job_n * 100
+        UB = self.init_job_durations.max() * self.max_mc_n * self.max_job_n * self.max_mc_n
         while UB > self.M:
             self.M *= 10
 
@@ -95,6 +95,9 @@ class JobShopEnv:
             self.e_all_succ = defaultdict()
             self.e_disj = defaultdict()
 
+            # self.reserved_e_disj = defaultdict()
+            self.reserved = defaultdict()
+
             for i in range(self.env_n):
                 self.e_pred[i] = envs[i].e_pred[0]
                 self.e_succ[i] = envs[i].e_succ[0]
@@ -107,7 +110,10 @@ class JobShopEnv:
 
                     self.e_disj[i, j] = copy.deepcopy(envs[i].e_disj[0, 0])
 
-    def load_problems(self, problems) -> (dict, list):
+                    # self.reserved_e_disj[i, j] = copy.deepcopy(envs[i].reserved_e_disj[0, 0])
+                    self.reserved[i, j] = copy.deepcopy(envs[i].reserved[0, 0])
+
+    def gen_init_idxs(self):
         self.init_job_durations = torch.zeros(self.env_n, self.max_job_n+1, self.max_mc_n+1, dtype=torch.long)
         self.init_job_mcs = torch.zeros(self.env_n, self.max_job_n+1, self.max_mc_n+1, dtype=torch.long)
         self.init_job_step_n = torch.zeros(self.env_n, self.max_job_n+1, dtype=torch.long)
@@ -122,12 +128,11 @@ class JobShopEnv:
 
         if 'rule' not in configs.agent_type:
             self.init_mc_ops = defaultdict()
+            self.init_mc_prev_op = defaultdict()
 
             self.init_e_pred = defaultdict()
             self.init_e_all_pred = defaultdict()
             self.init_e_disj = defaultdict()
-
-            self.init_mc_prev_op = defaultdict()
 
             for i in range(self.env_n):
                 self.init_mc_ops[i] = defaultdict(list)
@@ -136,6 +141,9 @@ class JobShopEnv:
                 self.init_e_pred[i] = list()
                 self.init_e_all_pred[i] = list()
                 self.init_e_disj[i] = list()
+
+    def load_problems(self, problems) -> (dict, list):
+        self.gen_init_idxs()
 
         for i, (benchmark, job_n, mc_n, instance_i) in enumerate(problems):
             job_mcs, job_prts = load_data(benchmark, job_n, mc_n, instance_i)
@@ -154,14 +162,8 @@ class JobShopEnv:
                     self.init_job_done[i, j, k:] += prts[k]
 
                     if 'rule' not in configs.agent_type:
-                        # disj arc #####
                         op = self.op_map[i, j, k].item()
                         m = job_mcs[j][k]
-
-                        for op2 in self.init_mc_ops[i][m]:
-                            self.init_e_disj[i].append((op, op2))
-                            self.init_e_disj[i].append((op2, op))
-                        self.init_mc_ops[i][m].append(op)
 
                         # pred arc #####
                         if k < len(prts) - 1:
@@ -170,6 +172,12 @@ class JobShopEnv:
                             # all_pred arc #####
                             for l in range(len(prts) - 1 - k):
                                 self.init_e_all_pred[i].append((op, op+1+l))
+
+                        # disj arc #####
+                        for op2 in self.init_mc_ops[i][m]:
+                            self.init_e_disj[i].append((op, op2))
+                            self.init_e_disj[i].append((op2, op))
+                        self.init_mc_ops[i][m].append(op)
 
     def init_index(self):
         self.ENV_IDX_J = torch.arange(self.env_n, dtype=torch.long)[:, None, None].expand(
@@ -203,8 +211,8 @@ class JobShopEnv:
         self.MC_PRIOR = self.MC_PRIOR.expand(self.env_n, self.pomo_n, self.max_mc_n)
 
         self.JOB_ONE = torch.full(size=(self.env_n, self.pomo_n, self.max_job_n+1), fill_value=1)
-        a = self.init_job_step_n.view(self.env_n, 1, self.max_job_n+1, 1).expand(-1, self.pomo_n, -1, self.max_mc_n+1)
-        self.JOB_OP = torch.where(self.JOB_STEP_IDX < a, 1, 0)
+        self.JOB_OP = torch.where(self.JOB_STEP_IDX < self.init_job_step_n.view(
+            self.env_n, 1, self.max_job_n+1, 1).expand(-1, self.pomo_n, -1, self.max_mc_n+1), 1, 0)
 
     #######################################################################################################
     def init_disj_info(self):
@@ -243,9 +251,9 @@ class JobShopEnv:
 
                 self.e_disj[i, j] = copy.deepcopy(self.init_e_disj[i])
 
-    def reset(self):
+    def reset_idxs(self):
         # static ##########################################
-        self.job_durations = self.init_job_durations.unsqueeze(dim=1).expand(-1, self.pomo_n, -1, -1)
+        self.job_durations = self.init_job_durations.unsqueeze(dim=1).repeat(1, self.pomo_n, 1, 1)
         self.job_mcs = self.init_job_mcs.unsqueeze(dim=1).expand(-1, self.pomo_n, -1, -1)
         self.op_mcs = self.job_mcs[:, :, :-1, :-1].reshape(self.env_n, self.pomo_n, -1)
 
@@ -258,17 +266,20 @@ class JobShopEnv:
         # dynamic #########################################
         self.job_last_step = torch.zeros(self.env_n, self.pomo_n, self.max_job_n+1, dtype=torch.long)
 
-        self.job_ready_t = self.init_job_ready.unsqueeze(dim=1).expand(-1, self.pomo_n, -1, -1)
-        self.job_ready_t_precedence = self.init_job_ready.unsqueeze(dim=1).expand(-1, self.pomo_n, -1, -1).clone()
+        self.job_ready_t = self.init_job_ready.unsqueeze(dim=1).repeat(1, self.pomo_n, 1, 1)
+        self.job_ready_t_precedence = self.init_job_ready.unsqueeze(dim=1).repeat(1, self.pomo_n, 1, 1).clone()
         self.job_ready_t_mc_gap = torch.zeros(self.env_n, self.pomo_n, self.max_job_n+1, self.max_mc_n+1,
                                               dtype=torch.long)
-        self.job_done_t = self.init_job_done.unsqueeze(dim=1).expand(-1, self.pomo_n, -1, -1)
-        self.job_arrival_t = self.init_job_arrival.unsqueeze(dim=1).expand(-1, self.pomo_n, -1)
+        self.job_done_t = self.init_job_done.unsqueeze(dim=1).repeat(1, self.pomo_n, 1, 1)
+        self.job_arrival_t_ = self.init_job_arrival.unsqueeze(dim=1).repeat(1, self.pomo_n, 1)
 
         self.mc_last_job = torch.full(size=(self.env_n, self.pomo_n, self.max_mc_n), fill_value=self.max_job_n)
         self.mc_last_job_step = torch.zeros(self.env_n, self.pomo_n, self.max_mc_n, dtype=torch.long)
 
         self.decision_n = torch.zeros(self.env_n, self.pomo_n, dtype=torch.long)
+
+    def reset(self):
+        self.reset_idxs()
 
         if 'rule' not in configs.agent_type:
             self.init_disj_info()
@@ -314,8 +325,7 @@ class JobShopEnv:
 
     ########################################################################################################
     def assign(self, mc_job):  # assign for a machine
-        ########################################################################################
-        # assign job remain ops #######
+        # assign job remain ops ###############################################################
         assign_job = torch.zeros(self.env_n, self.pomo_n, self.max_job_n+1, dtype=torch.long)
         assign_job.scatter_(2, index=mc_job, src=self.JOB_ONE)[:, :, -1] = 0
         assign_job_ = assign_job.view(self.env_n, self.pomo_n, self.max_job_n+1, -1).expand(
@@ -325,7 +335,7 @@ class JobShopEnv:
             -1, -1, -1, self.max_mc_n+1)
         assign_job_follow = torch.where(last_step <= self.JOB_STEP_IDX, 1, 0).mul(assign_job_)
 
-        # ready_t update - assigned job ######
+        # ready_t update - assigned job ########################################################
         assign_mc_gap = self.job_ready_t_mc_gap[self.ENV_IDX_J, self.POMO_IDX_J, self.JOB_IDX,
                                                 self.job_last_step].mul(assign_job)
         assign_mc_gap = assign_mc_gap.view(self.env_n, self.pomo_n, self.max_job_n+1, -1).expand(
@@ -333,13 +343,7 @@ class JobShopEnv:
         self.job_ready_t_mc_gap -= assign_mc_gap
         self.job_ready_t_precedence += assign_mc_gap
 
-        ########################################################################################
-        # mc_last_job update  ######
-        self.mc_last_job = torch.where(mc_job < self.max_job_n, mc_job, self.mc_last_job)
-        mc_assigned_job_last_step = self.job_last_step[self.ENV_IDX_M, self.POMO_IDX_M, mc_job]
-        self.mc_last_job_step = torch.where(mc_job < self.max_job_n, mc_assigned_job_last_step, self.mc_last_job_step)
-
-        # disjunctive arc update #####
+        # disjunctive arc update ###############################################################
         if 'rule' not in configs.agent_type:
             mcs_ = mc_job.argmin(dim=2)
             assign_job_ = assign_job.argmax(dim=2)
@@ -354,40 +358,40 @@ class JobShopEnv:
                     if job == self.max_job_n:
                         continue
 
-                    op = job * self.max_mc_n + self.job_last_step[i, j, job].item()
+                    op = self.op_map[i, job, self.job_last_step[i, j, job]].item()
                     self.mc_ops[i, j][mc].remove(op)
 
+                    del_list = [(op2, op) for op2 in self.mc_ops[i, j][mc]]
+                    prev_op = None
                     if mc in self.mc_prev_op[i, j]:
                         prev_op = self.mc_prev_op[i, j][mc]
-                        del_list = [(op2, op) for op2 in self.mc_ops[i, j][mc]] + \
-                                   [(prev_op, op2) for op2 in self.mc_ops[i, j][mc]]
-                    else:
-                        del_list = [(op2, op) for op2 in self.mc_ops[i, j][mc]]
+                        del_list += [(prev_op, op2) for op2 in self.mc_ops[i, j][mc]]
                     self.mc_prev_op[i, j][mc] = op
 
                     # remove: unassigned ops -> selected op / previous op -> unassigned ops
                     self.e_disj[i, j] = list(set(self.e_disj[i, j]) - set(del_list))
 
-        # job_last_step update ######
-        self.job_last_step[self.ENV_IDX_M, self.POMO_IDX_M, mc_job] += 1
-        # print('action')
-        # print(mc_job, self.job_last_step, self.mc_last_job, self.mc_last_job_step)
-        self.job_last_step[:, :, self.max_job_n] = 0
+        # mc_last_job, job_last_step update  ##################################################################
+        self.mc_last_job = torch.where(mc_job < self.max_job_n, mc_job, self.mc_last_job)
+        mc_assigned_job_last_step = self.job_last_step[self.ENV_IDX_M, self.POMO_IDX_M, mc_job]
+        self.mc_last_job_step = torch.where(mc_job < self.max_job_n, mc_assigned_job_last_step, self.mc_last_job_step)
 
-        ########################################################################################
-        # same mc jobs mc_gap update #################
-        # job mc_t #####
+        self.job_last_step[self.ENV_IDX_M, self.POMO_IDX_M, mc_job] += 1
+        self.job_last_step[:, :, -1] = 0
+
+        # same mc jobs mc_gap update #########################################################################
+        # job mc_t ##############################################################################
         mc_t = self.job_done_t[self.ENV_IDX_M, self.POMO_IDX_M, self.mc_last_job, self.mc_last_job_step]
         job_mc_t = mc_t[self.ENV_IDX_O_, self.POMO_IDX_O_, self.job_mcs]
 
-        # remain operations ######
+        # remain operations #####################################################################
         last_step = self.job_last_step.view(self.env_n, self.pomo_n, self.max_job_n+1, -1).expand(
             -1, -1, -1, self.max_mc_n+1)
         job_remain = torch.where(last_step <= self.JOB_STEP_IDX, 1, 0)  # (env_n, pomo_n, max_job_n+1, max_mc_n+1)
         job_remain[:, :, -1, :] = 0
         job_remain[:, :, :, -1] = 0
 
-        # same step ######
+        # same step #############################################################################
         same_mc_step = self.target_mc[self.ENV_IDX_O_, self.POMO_IDX_O_, self.job_mcs].mul(job_remain).mul(self.JOB_OP)
 
         step_pos = same_mc_step.argmax(dim=3).view(self.env_n, self.pomo_n, self.max_job_n+1, -1).expand(
@@ -402,8 +406,7 @@ class JobShopEnv:
 
         self.job_ready_t_mc_gap = torch.where(self.job_ready_t_mc_gap > mc_update, self.job_ready_t_mc_gap, mc_update)
 
-        #######################################################################################
-        # ready_t update ######
+        # ready_t update ######################################################################
         self.job_ready_t = self.job_ready_t_precedence + self.job_ready_t_mc_gap
         self.job_done_t = self.job_ready_t + self.job_durations
 
@@ -411,11 +414,11 @@ class JobShopEnv:
         next_state = False
 
         while not next_state:
-            # candidate job ################################################################################
             job_mask = torch.where(self.job_last_step < self.job_step_n, 0, self.M)
             start_t = self.job_ready_t[self.ENV_IDX_J, self.POMO_IDX_J, self.JOB_IDX, self.job_last_step] + job_mask
             self.curr_t = torch.min(start_t, dim=2)[0]  # (env_n, pomo_n)
 
+            # candidate job ################################################################################
             job_mcs = self.job_mcs[self.ENV_IDX_J, self.POMO_IDX_J, self.JOB_IDX, self.job_last_step][:, :, :-1]
 
             if 'conflict' in configs.action_type:
@@ -587,6 +590,10 @@ class JobShopEnv:
 
             # delay_op, delay_mc ##############################
             mc_t = self.job_done_t[self.ENV_IDX_M, self.POMO_IDX_M, self.mc_last_job, self.mc_last_job_step]
+            if 'mc_breakdown' in configs.dyn_type:
+                if 'known' in configs.dyn_type:
+                    mc_t = torch.where(self.mc_repair > mc_t, self.mc_repair, mc_t)
+
             curr_t__ = self.curr_t.view(self.env_n, self.pomo_n, 1).expand(-1, -1, self.max_mc_n)
             mc_t = torch.where(mc_t < curr_t__, curr_t__, mc_t)
             op_mc_t = mc_t[self.ENV_IDX_O, self.POMO_IDX_O, self.op_mcs]
@@ -616,8 +623,7 @@ class JobShopEnv:
             if 'mc_load' in configs.state_type:
                 x_list.append(op_mc_load)
 
-            return torch.cat([torch.stack([prt, tail_t, tail_n], dim=3), op_status, torch.stack(x_list, dim=3)],
-                             dim=3)
+            return torch.cat([torch.stack([prt, tail_t, tail_n], dim=3), op_status, torch.stack(x_list, dim=3)], dim=3)
 
     def get_torch_geom(self):
         if 'rule' in configs.agent_type:
@@ -635,8 +641,12 @@ class JobShopEnv:
             if 'dyn' in configs.env_type:
                 curr_t_ = self.curr_t.view(self.env_n, self.pomo_n, 1, 1).expand(
                     -1, -1, self.max_job_n + 1, self.max_mc_n)
-                op_remain = torch.where(self.job_done_t[:, :, :, :-1] > curr_t_, 1, 0)[:, :, :-1, :].view(
-                    self.env_n, self.pomo_n, -1)
+                op_remain = torch.where(self.job_done_t[:, :, :, :-1] > curr_t_, 1, 0)
+                if 'job_arrival' in configs.dyn_type:
+                    job_arrival_t_ = self.job_arrival_t_.unsqueeze(dim=3).expand(-1, -1, -1, self.max_mc_n)
+                    job_avail = torch.where(curr_t_ >= job_arrival_t_, 1, 0)  # reflect non-arrival
+                    op_remain = op_remain.mul(job_avail)
+                op_remain = op_remain[:, :, :-1, :].view(self.env_n, self.pomo_n, -1)
 
             def get_data(i, j):
                 # torch_geom ############################
@@ -657,9 +667,8 @@ class JobShopEnv:
                 data['op', 'all', 'op'].edge_index = torch.cat([self.e_pred[i], self.e_succ[i], e_disj], dim=1)
 
                 # meta edges
-                if 'all_pred' in configs.model_type:
-                    data['op', 'all_pred', 'op'].edge_index = self.e_all_pred[i]
-                    data['op', 'all_succ', 'op'].edge_index = self.e_all_succ[i]
+                data['op', 'all_pred', 'op'].edge_index = self.e_all_pred[i]
+                data['op', 'all_succ', 'op'].edge_index = self.e_all_succ[i]
 
                 #######################################################################################################
                 if 'dyn' in configs.env_type:
@@ -713,9 +722,9 @@ class JobShopEnv:
         max_done_t = self.job_done_t[self.ENV_IDX_J, self.POMO_IDX_J, self.JOB_IDX, self.job_step_n-1].max(dim=2)[0]
 
         # total_complete_t ##############
-        # done_t = (self.job_done_t[self.ENV_IDX_J, self.POMO_IDX_J, self.JOB_IDX, self.job_step_n - 1] -
-        #           self.job_arrival_t)[:, :, :-1]
-        # total_c_t = done_t.sum(dim=2)
+        done_t = (self.job_done_t[self.ENV_IDX_J, self.POMO_IDX_J, self.JOB_IDX, self.job_step_n-1] -
+                  self.job_arrival_t_)[:, :, :-1]
+        total_c_t = done_t.sum(dim=2)
 
         # mc LB ##############
         # mc_t = self.job_done_t[self.ENV_IDX_M, self.POMO_IDX_M, self.mc_last_job, self.mc_last_job_step]
@@ -774,7 +783,13 @@ class JobShopEnv:
         index_prod = index_prod.view(1, self.pomo_n, 1).expand(self.env_n, -1, op_mask.size()[2])
 
         index = features[self.ENV_IDX_O, self.POMO_IDX_O, self.OP_IDX, index_pos].mul(index_prod)
-        index -= (1 - op_mask) * self.M
+        index -= (1 - op_mask) * 1e4
+
+        # tie: FIFO -> SPT
+        index_FIFO = -features[self.ENV_IDX_O, self.POMO_IDX_O, self.OP_IDX, 5]
+        index_SPT = -features[self.ENV_IDX_O, self.POMO_IDX_O, self.OP_IDX, 0]
+        index += index_FIFO * 1e-4 + index_SPT * 1e-8
+
         return self.get_assign_job(index.argmax(dim=2))
 
     def get_assign_job(self, selected_index):
@@ -821,11 +836,21 @@ class JobShopEnv:
                                          "{}, {}, {}".format(i, j, prt))], columns=col_name)
                     df = pd.concat([df, df2])
 
+        # breakdown
+        if 'mc_breakdown' in configs.dyn_type:
+            if 'known' in configs.dyn_type:
+                for k in range(self.max_mc_n):
+                    s_t = configs.parameter * k
+                    e_t = configs.parameter * (k+1)
+                    df2 = pd.DataFrame([(-1, -1, -1, k, s_t, e_t,
+                                         "{}, {}, {}".format('break', 'break', configs.parameter))], columns=col_name)
+                    df = pd.concat([df, df2])
+
         df = df[1:]
         df['delta'] = df['end_t'] - df['start_t']
 
         fig = px.timeline(df, x_start="start_t", x_end="end_t", y="resource",
-                          color="job_id", text="text", opacity=0.7,
+                          color="job_id", text="text", opacity=0.6,
                           color_continuous_scale='rainbow')  # https://plotly.com/python/colorscales/
 
         fig.update_yaxes(autorange="reversed")
@@ -855,7 +880,7 @@ class JobShopEnv:
 
 
 if __name__ == "__main__":
-    from utils import all_rules, all_benchmarks, action_types, REAL_D, REAL_D2, FLOW
+    from utils import all_rules, all_benchmarks, action_types, REAL_D, FLOW
     import csv, time
     import cProfile
 
@@ -951,7 +976,7 @@ if __name__ == "__main__":
         os.makedirs(save_folder)
     save_path = save_folder + f'result_rule_flow.csv'
 
-    for (benchmark, job_n, mc_n, instances) in FLOW:
+    for (benchmark, job_n, mc_n, instances) in all_benchmarks:
         print(benchmark, job_n, mc_n, instances)
         for i in tqdm(instances):
             envs_info = [(benchmark, job_n, mc_n, i)]

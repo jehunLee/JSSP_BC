@@ -15,7 +15,7 @@ parser.add_argument('--model_global_type', type=str, default='mean_global', help
 parser.add_argument('--action_type', type=str, default='conflict', help='action type of MDP: buffer, conflict')
 
 # dynamic environment
-parser.add_argument('--dyn_type', type=str, default='', help='')
+parser.add_argument('--dyn_type', type=str, default='', help='dynamic environment type: job_arrival, mc_breakdown_known, prt_stochastic_known, ')
 parser.add_argument('--parameter', type=float, default=0, help='')
 parser.add_argument('--dyn_reserve_reset', type=bool, default=True, help='')
 

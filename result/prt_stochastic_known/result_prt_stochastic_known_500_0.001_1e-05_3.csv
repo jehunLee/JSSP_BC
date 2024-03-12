@@ -1934,3 +1934,4 @@ DMU,50,20,6,GNN_BC_policy,conflict,mc_gap_mc_load_prt_norm,model,0.001,1e-05,MSE
 DMU,50,20,7,GNN_BC_policy,conflict,mc_gap_mc_load_prt_norm,model,0.001,1e-05,MSE,8603,17.0083,706,3,dyn,type_all_pred_GAT2_mean_global,prt_stochastic_known,0.4,False
 DMU,50,20,8,GNN_BC_policy,conflict,mc_gap_mc_load_prt_norm,model,0.001,1e-05,MSE,8693,16.1517,676,3,dyn,type_all_pred_GAT2_mean_global,prt_stochastic_known,0.4,False
 DMU,50,20,9,GNN_BC_policy,conflict,mc_gap_mc_load_prt_norm,model,0.001,1e-05,MSE,8591,16.458,669,3,dyn,type_all_pred_GAT2_mean_global,prt_stochastic_known,0.4,False
+TA,15,15,0,GNN_BC_policy,conflict,mc_gap_mc_load_prt_norm,model,0.001,1e-05,MSE,1353,3.2147,126,3,dyn,type_all_pred_GAT2,prt_stochastic_known,0.1,True
