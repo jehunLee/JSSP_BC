@@ -763,6 +763,8 @@ class JobShopEnv:
                 return -1, 3
             elif rule == 'FDD/MWKR':
                 return -1, 4
+            elif rule == 'FIFO':
+                return -1, 5
             else:
                 return 0
 
@@ -783,12 +785,12 @@ class JobShopEnv:
         index_prod = index_prod.view(1, self.pomo_n, 1).expand(self.env_n, -1, op_mask.size()[2])
 
         index = features[self.ENV_IDX_O, self.POMO_IDX_O, self.OP_IDX, index_pos].mul(index_prod)
-        index -= (1 - op_mask) * 1e4
+        index -= (1 - op_mask) * self.M
 
         # tie: FIFO -> SPT
         index_FIFO = -features[self.ENV_IDX_O, self.POMO_IDX_O, self.OP_IDX, 5]
         index_SPT = -features[self.ENV_IDX_O, self.POMO_IDX_O, self.OP_IDX, 0]
-        index += index_FIFO * 1e-4 + index_SPT * 1e-8
+        index += index_FIFO / self.M + index_SPT / self.M / self.M
 
         return self.get_assign_job(index.argmax(dim=2))
 
@@ -807,6 +809,7 @@ class JobShopEnv:
             obs, reward, done = self.step(a)
         return reward, self.decision_n
 
+    #####################################################################################################
     def show_gantt_plotly(self, env_i, pomo_i, title: str=''):
         import pandas as pd
         import plotly.express as px
@@ -882,38 +885,19 @@ class JobShopEnv:
 if __name__ == "__main__":
     from utils import all_rules, all_benchmarks, action_types, REAL_D, FLOW
     import csv, time
-    import cProfile
-
+    # import cProfile
+    #
     # configs.agent_type = 'rule'
     # # configs.action_type = 'conflict'
     # configs.action_type = 'buffer'
     #
-    # ##############################################
-    # # rules = ['LTT', 'MOR', 'LRPT', 'FDD/MWKR', 'SPT']
-    # # # rules = ['LTT']
-    # # env = JobShopEnv([('TA', 20, 15, 0)], pomo_n=len(rules))
-    # # obs, reward, done = env.reset()
-    # #
-    # # while not done:
-    # #     a = env.get_action_rule(obs, rules)
-    # #     obs, reward, done = env.step(a)
-    # # # env.show_gantt_plotly(0, 0)
-    # # print(reward)
-    # # ##############################################
-    #
-    # # rules = ['LTT', 'MOR', 'FDD/MWKR', 'LRPT', 'SPT']
-    # rules = ['LTT']
-    #
-    # # HUN 4x3_0: 84, 87, 86, 87, 99         / 84, 84, 84, 84, 84             - 84
-    # # HUN 6x6_0: 195, 196, 195, 195, 219    / 168, 171, 173, 185, 168        - 168
-    # # HUN 6x6_1: 196, 194, 206, 196, 207    / 195, 184, 195, 190, 167        - 167
-    # # HUN 8x6_0: 193, 181, 192, 187, 197    / 164, 179, 177, 177, 164        - 164
-    # # TA 15x15_0: 1484, 1438, 1491, 1462    / 1498, 1434, 1397, 1385, 1386   - 1386
+    # rules = ['LTT', 'MOR', 'FDD/MWKR', 'LRPT', 'SPT']
+    # # TA 15x15_0: 1484, 1450, 1422, 1491, 1462
     #
     # def main():
-    #     # env = JobShopEnv([('TA', 15, 15, 0)], pomo_n=len(rules))
+    #     env = JobShopEnv([('TA', 15, 15, 0)], pomo_n=len(rules))
     #     # env = JobShopEnv([('HUN', 4, 3, 0)], pomo_n=len(rules))
-    #     env = JobShopEnv([('TEST', 4, 4, 0)], pomo_n=len(rules))  # paper
+    #     # env = JobShopEnv([('TEST', 4, 4, 0)], pomo_n=len(rules))  # paper
     #
     #     obs, reward, done = env.reset()
     #     while not done:
@@ -922,44 +906,10 @@ if __name__ == "__main__":
     #
     #     print(reward)
     #     # print(env.decision_n)
-    #     # env.show_gantt_plotly(0, 0)
+    #     env.show_gantt_plotly(0, 1)
     #
     # # cProfile.run('main()')
     # main()
-
-    # for configs.action_type in ['single_mc_buffer']:
-    #     save_path = './../result/bench_rule.csv'
-    #
-    #     for (benchmark, job_n, mc_n, instances) in all_benchmarks:
-    #         print(benchmark, job_n, mc_n, instances)
-    #         for i in instances:
-    #             for rule in all_rules:
-    #                 envs_info = [(benchmark, job_n, mc_n, i)]
-    #                 env = JobShopEnv(envs_info, pomo_n=1)
-    #
-    #                 ##############################################
-    #                 s_t = time.time()
-    #                 obs, reward, done = env.reset()
-    #
-    #                 while not done:
-    #                     a = env.get_action_rule(obs, [rule])
-    #                     obs, reward, done = env.step(a)
-    #                 # env.show_gantt_plotly(0, 0)
-    #                 run_t = round(time.time() - s_t, 4)
-    #                 print(run_t)
-                    #############################################
-    #                 print(i, rule, run_t)
-    #                 with open(save_path, 'a', newline='') as f:
-    #                     wr = csv.writer(f)
-    #                     wr.writerow([benchmark, job_n, mc_n, i,
-    #                                  configs.agent_type, configs.action_type, configs.state_type, rule,
-    #                                  -reward[0, 0].item(), run_t])
-
-    # TA 15x15 rule: 0.152s
-    # TA 100x20 rule: 17.6s
-
-    # TA 15x15 rule: 0.075s
-    # TA 100x20 rule: 1.13s
 
 
     ###########################################################################################################
