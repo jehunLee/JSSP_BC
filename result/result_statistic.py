@@ -37,7 +37,6 @@ def get_optimal_gap_rank(merge_data, method_list, del_problems=[], consider_prob
                                                                                    merge_data['compare_gap'])]
         merge_data[f'{cp_name}_better'] = [1 if o < c_o else 0 for (o, c_o) in zip(merge_data['opt_gap'],
                                                                                    merge_data['compare_gap'])]
-
     print(merge_data['method'].value_counts())
 
     rank_data = merge_data.groupby(['method'], as_index=False).mean()
@@ -53,11 +52,8 @@ def get_optimal_gap_rank(merge_data, method_list, del_problems=[], consider_prob
     rank_data['opt_TF'] = rank_data2['opt_TF']
     pivot = merge_data.pivot(index=['problem', 'instance_i'], columns=['method'], values='opt_gap')
 
-    merge_data0 = merge_data.groupby(['problem', 'method'], as_index=False).mean()
-    pivot0 = merge_data0.pivot(index=['problem'], columns=['method'], values='opt_gap')
-
-
-
+    # merge_data0 = merge_data.groupby(['problem', 'method'], as_index=False).mean()
+    # pivot0 = merge_data0.pivot(index=['problem'], columns=['method'], values='opt_gap')
 
     merge_data2 = merge_data2[merge_data2['method'].isin(method_list)]
     if consider_problem:
@@ -74,24 +70,25 @@ def get_optimal_gap_rank(merge_data, method_list, del_problems=[], consider_prob
 
 
 ##############################################################################################################
-model_i = 3
-file_name = f'./data_n/result_500_0.001_1e-05_{model_i}.csv'
-merge_data = get_load_result_data(test_csv_file_name=file_name)
+# model_i = 3
+# file_name = f'./data_n/result_500_0.001_1e-05_{model_i}.csv'
+merge_data = get_load_result_data()
 # compare_CPs = ['CP (1 sec)', 'CP (10 sec)', 'CP (60 sec)']
 
 method_list = ['Zhang', 'ScheduleNet', 'Park', 'LTT', 'FDD/MWKR', 'MOR', 'SPT', 'Ours']
 merge_data_ = merge_data[merge_data['method'].isin(method_list)]
 group_data2 = merge_data_.groupby(['method', 'problem'], as_index=False).mean()
-group_data3 = group_data2.pivot(index='problem', columns=['method'], values='opt_gap')
-group_data2_ = merge_data_.groupby(['method', 'problem'], as_index=False).sum()
-group_data3_ = group_data2_.pivot(index='problem', columns=['method'], values='instance_i')
+group_data2_ = group_data2.pivot(index='problem', columns=['method'], values='opt_gap')
+group_data3 = merge_data_.groupby(['method', 'problem'], as_index=False).sum()
+group_data3_ = group_data3.pivot(index='problem', columns=['method'], values='instance_i')
 
 # rank for -DMU ##########
-method_list = ['ScheduleNet', 'Park', 'LTT', 'FDD/MWKR', 'MOR', f'model{model_i}']  # 'Ours', , 'SPT', 'LRPT'
+method_list = ['ScheduleNet', 'Park', 'LTT', 'FDD/MWKR', 'MOR', 'Ours']  # 'Ours', , 'SPT', 'LRPT'
 instance_n, rank_data, pivot1, pivot2 = get_optimal_gap_rank(merge_data, method_list, del_problems=['DMU'])
 # print('-DMU', instance_n)
 print(rank_data)
 
+# rank for TA ##########
 method_list = ['Iklassov', 'ScheduleNet', 'Park', 'LTT', 'Zhang', 'Ours']  # 'Ours', , 'SPT', 'LRPT'
 instance_n, rank_data, pivot1, pivot2 = get_optimal_gap_rank(merge_data, method_list, consider_problem='TA')
 # print('-DMU', instance_n)
@@ -145,20 +142,9 @@ def get_job_n_result(merge_data, method_list, del_problems, group_creteria, col=
 ##############################################################################################################
 # group_creteria = [10, 20, 30, 100]
 group_creteria = [10, 15, 20, 30, 100]
-
 group_creteria2 = [6, 10, 15, 20]
 
-# group for -DMU ##########
-# method_list = ['Ours', 'ScheduleNet', 'Park', 'LTT', 'FDD/MWKR', 'MOR', 'SPT']
-# group_data = get_job_n_result(merge_data, method_list, ['DMU'], group_creteria, col='job_n')
-# group_data2 = get_job_n_result(merge_data, method_list, ['DMU'], group_creteria2, col='mc_n')
-
-# # group for DMU ##########
-# method_list = ['Ours', 'Zhang', 'LTT', 'MOR', 'SPT']
-# group_data = get_job_n_result(merge_data, method_list, [], group_creteria, consider_problem='DMU', col='job_n')
-# group_data2 = get_job_n_result(merge_data, method_list, [], group_creteria2, consider_problem='DMU', col='mc_n')
-
-method_list = [f'model{model_i}', 'Han', 'ScheduleNet', 'Park', 'LTT', 'FDD/MWKR', 'MOR']
+method_list = ['Ours', 'Han', 'ScheduleNet', 'Park', 'LTT', 'FDD/MWKR', 'MOR']
 group_data1, group_data2 = get_job_n_result(merge_data, method_list, ['DMU'], group_creteria, col='job_n')
 # group_data2 = get_job_n_result(merge_data, method_list, ['DMU'], group_creteria2, col='mc_n')
 print()

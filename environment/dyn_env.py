@@ -63,6 +63,7 @@ class JobShopDynEnv(JobShopEnv):
                     self.init_job_done[i, j] += arrival_t
                     if arrival_t > 0:
                         self.init_events[i].append((arrival_t, 'job_arrival', j, None))
+            self.init_job_flow_due_date += self.init_job_arrival[:, :-1, None].expand(-1, -1, self.max_mc_n)
 
         if 'mc_breakdown' in configs.dyn_type:
             for i, (_, _, mc_n, _) in enumerate(problems):
@@ -526,134 +527,29 @@ class JobShopDynEnv(JobShopEnv):
 
 
 if __name__ == "__main__":
-    from utils import all_rules, all_benchmarks, action_types
+    from utils import rules_5, all_benchmarks, REAL_D, FLOW
     import csv, time
-    import cProfile
-
-    configs.agent_type = 'rule'
-    # configs.action_type = 'conflict'
-    configs.action_type = 'buffer'
-
-    ##########################################################
-    configs.dyn_reserve_reset = True
-
-    # configs.dyn_type = 'mc_breakdown'
-    # parameters = [50, 100, 150, 200]
-    # configs.parameter = 0.4
-
-    # configs.dyn_type = 'job_arrival'
-    # parameters = [100, 200, 300, 400]
-    # configs.parameter = 50  # 50
-    # configs.init_batch = 1
-
-    # configs.dyn_type = 'prt_stochastic'
-    # parameters = [0.1, 0.2, 0.3, 0.4]
-    # configs.parameter = 0.4
-
-    ##############################################
-    # rules = ['LTT', 'MOR', 'LRPT', 'FDD/MWKR', 'SPT']
-    # # rules = ['LTT']
-    # env = JobShopEnv([('TA', 20, 15, 0)], pomo_n=len(rules))
-    # obs, reward, done = env.reset()
-    #
-    # while not done:
-    #     a = env.get_action_rule(obs, rules)
-    #     obs, reward, done = env.step(a)
-    # # env.show_gantt_plotly(0, 0)
-    # print(reward)
-    # ##############################################
-
-    # rules = ['LTT', 'MOR', 'FDD/MWKR', 'LRPT', 'SPT']
-    # rules = ['LTT']  # , 'SPT', 'MOR', 'LPT', 'STT', 'LRPT', 'FDD/MWKR']
-
-    # HUN 4x3_0: 84, 87, 86, 87, 99         / 84, 84, 84, 84, 84             - 84
-    # HUN 6x6_0: 195, 196, 195, 195, 219    / 168, 171, 173, 185, 168        - 168
-    # HUN 6x6_1: 196, 194, 206, 196, 207    / 195, 184, 195, 190, 167        - 167
-    # HUN 8x6_0: 193, 181, 192, 187, 197    / 164, 179, 177, 177, 164        - 164
-    # TA 15x15_0: 1484, 1438, 1491, 1462    / 1498, 1434, 1397, 1385, 1386   - 1386
-
-    # def main(i):
-    #     # env = JobShopDynEnv([('TA', 15, 15, 0)], pomo_n=len(rules))
-    #     # env = JobShopDynEnv([('HUN', 4, 3, 0)], pomo_n=len(rules))
-    #     # env = JobShopDynEnv([('TEST', 4, 4, 0)], pomo_n=len(rules))  # paper
-    #     # env = JobShopDynEnv([('HUN', 8, 3, 0)], pomo_n=len(rules))
-    #     # env = JobShopDynEnv([('HUN', 5, 2, 0)], pomo_n=len(rules))
-    #     # env = JobShopDynEnv([('TEST', 4, 3, 1)], pomo_n=len(rules))
-    #     # env = JobShopDynEnv([('TEST', 4, 3, i)], pomo_n=len(rules))  # 3 - 1, 11, 42, 46 / 10 - 0, 14
-    #     env = JobShopDynEnv([('HUN', 6, 4, i)], pomo_n=len(rules))  # 50 - 11
-    #
-    #     obs, reward, done = env.reset()
-    #     while not done:
-    #         a = env.get_action_rule(obs, rules)
-    #         obs, reward, done = env.step(a)
-
-        # print(env.decision_n)
-        # for j in range(len(rules)):
-        #     env.show_gantt_plotly(0, j)
-        # print(reward)
-
-    # cProfile.run('main()')
-    # for i in range(11, 50):
-    #     print(i)
-    #     main(i)
-
-    ###########################################################################################################
-    # for configs.action_type in ['single_mc_buffer']:
-    #     save_path = './../result/bench_rule.csv'
-    #
-    #     for (benchmark, job_n, mc_n, instances) in all_benchmarks:
-    #         print(benchmark, job_n, mc_n, instances)
-    #         for i in instances:
-    #             for rule in all_rules:
-    #                 envs_info = [(benchmark, job_n, mc_n, i)]
-    #                 env = JobShopDynEnv(envs_info, pomo_n=1)
-    #
-    #                 ##############################################
-    #                 s_t = time.time()
-    #                 obs, reward, done = env.reset()
-    #
-    #                 while not done:
-    #                     a = env.get_action_rule(obs, [rule])
-    #                     obs, reward, done = env.step(a)
-    #                 # env.show_gantt_plotly(0, 0)
-    #                 run_t = round(time.time() - s_t, 4)
-    #                 print(run_t)
-    #                 ############################################
-    #                 print(i, rule, run_t)
-    #                 with open(save_path, 'a', newline='') as f:
-    #                     wr = csv.writer(f)
-    #                     wr.writerow([benchmark, job_n, mc_n, i,
-    #                                  configs.agent_type, configs.action_type, configs.state_type, rule,
-    #                                  -reward[0, 0].item(), run_t])
-
-    # TA 15x15 rule: 0.152s
-    # TA 100x20 rule: 17.6s
-    #
-    # TA 15x15 rule: 0.075s
-    # TA 100x20 rule: 1.13s
 
     ###########################################################################################################
     from utils import all_dyn_benchmarks, all_benchmarks
     import os
 
-    # configs.dyn_type = 'job_arrival'
-    # parameters = [100, 200, 300, 400]
-    # configs.init_batch = 2
+    configs.action_type = 'buffer'
+    configs.agent_type = 'rule'
+    rules = rules_5
+    # rules = ['LTT']
+
+    configs.dyn_type = 'job_arrival'
+    parameters = [100, 200, 300, 400]
+    configs.init_batch = 2
 
     # configs.dyn_type = 'mc_breakdown_known'
     # parameters = [100, 200, 300, 400]
 
-    configs.dyn_type = 'prt_stochastic_known'
-    parameters = [0.1, 0.2, 0.3, 0.4]
+    # configs.dyn_type = 'prt_stochastic_known'
+    # parameters = [0.1, 0.2, 0.3, 0.4]
 
     #########################################################
-    configs.action_type = 'buffer'
-    # configs.action_type = 'conflict'
-    configs.agent_type = 'rule'
-    rules = all_rules
-    # rules = ['LTT']
-    # rules = ['LTT', 'SPT']
-
     save_folder = f'./../result/{configs.dyn_type}/'
     if not os.path.exists(save_folder):
         os.makedirs(save_folder)
@@ -661,7 +557,7 @@ if __name__ == "__main__":
 
     for configs.dyn_reserve_reset in [True]:
         for configs.parameter in parameters:
-            for (benchmark, job_n, mc_n, instances) in all_benchmarks:  # [['HUN', 6, 4, [0]]]  all_benchmarks
+            for (benchmark, job_n, mc_n, instances) in all_dyn_benchmarks:  # [['HUN', 6, 4, [0]]]  all_benchmarks
                 print(benchmark, job_n, mc_n, instances)
                 for i in instances:
                     envs_info = [(benchmark, job_n, mc_n, i)]

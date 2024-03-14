@@ -181,34 +181,34 @@ class JobShopEnv:
 
     def init_index(self):
         self.ENV_IDX_J = torch.arange(self.env_n, dtype=torch.long)[:, None, None].expand(
-            self.env_n, self.pomo_n, self.max_job_n+1)
+            -1, self.pomo_n, self.max_job_n+1)
         self.POMO_IDX_J = torch.arange(self.pomo_n, dtype=torch.long)[None, :, None].expand(
-            self.env_n, self.pomo_n, self.max_job_n+1)
+            self.env_n, -1, self.max_job_n+1)
         self.JOB_IDX = torch.arange(self.max_job_n+1, dtype=torch.long)[None, None, :].expand(
-            self.env_n, self.pomo_n, self.max_job_n+1)
+            self.env_n, self.pomo_n, -1)
 
         self.ENV_IDX_M = torch.arange(self.env_n, dtype=torch.long)[:, None, None].expand(
-            self.env_n, self.pomo_n, self.max_mc_n)
+            -1, self.pomo_n, self.max_mc_n)
         self.POMO_IDX_M = torch.arange(self.pomo_n, dtype=torch.long)[None, :, None].expand(
-            self.env_n, self.pomo_n, self.max_mc_n)
+            self.env_n, -1, self.max_mc_n)
 
         self.ENV_IDX_O_ = torch.arange(self.env_n, dtype=torch.long)[:, None, None, None].expand(
-            self.env_n, self.pomo_n, self.max_job_n+1, self.max_mc_n+1)
+            -1, self.pomo_n, self.max_job_n+1, self.max_mc_n+1)
         self.POMO_IDX_O_ = torch.arange(self.pomo_n, dtype=torch.long)[None, :, None, None].expand(
-            self.env_n, self.pomo_n, self.max_job_n+1, self.max_mc_n+1)
+            self.env_n, -1, self.max_job_n+1, self.max_mc_n+1)
 
         self.JOB_STEP_IDX = torch.arange(self.max_mc_n+1, dtype=torch.long)[None, None, None, :].expand(
-            self.env_n, self.pomo_n, self.max_job_n+1, self.max_mc_n+1)
+            self.env_n, self.pomo_n, self.max_job_n+1, -1)
 
         self.ENV_IDX_O = torch.arange(self.env_n, dtype=torch.long)[:, None, None].expand(
-            self.env_n, self.pomo_n, self.op_n)
+            -1, self.pomo_n, self.op_n)
         self.POMO_IDX_O = torch.arange(self.pomo_n, dtype=torch.long)[None, :, None].expand(
-            self.env_n, self.pomo_n, self.op_n)
+            self.env_n, -1, self.op_n)
         self.OP_IDX = torch.arange(self.op_n, dtype=torch.long)[None, None, :].expand(
-            self.env_n, self.pomo_n, self.op_n)
+            self.env_n, self.pomo_n, -1)
 
         self.MC_PRIOR = torch.arange(self.max_mc_n, dtype=torch.long)[None, None, :].flip(dims=[2]) + 1
-        self.MC_PRIOR = self.MC_PRIOR.expand(self.env_n, self.pomo_n, self.max_mc_n)
+        self.MC_PRIOR = self.MC_PRIOR.expand(self.env_n, self.pomo_n, -1)
 
         self.JOB_ONE = torch.full(size=(self.env_n, self.pomo_n, self.max_job_n+1), fill_value=1)
         self.JOB_OP = torch.where(self.JOB_STEP_IDX < self.init_job_step_n.view(
@@ -883,7 +883,7 @@ class JobShopEnv:
 
 
 if __name__ == "__main__":
-    from utils import all_rules, all_benchmarks, action_types, REAL_D, FLOW
+    from utils import rules_5, all_benchmarks, REAL_D, FLOW
     import csv, time
     # import cProfile
     #
@@ -918,9 +918,10 @@ if __name__ == "__main__":
 
     configs.action_type = 'buffer'
     configs.agent_type = 'rule'
-    rules = all_rules
+    rules = rules_5
     # rules = ['LTT']
 
+    #########################################################
     save_folder = f'./../result/'
     if not os.path.exists(save_folder):
         os.makedirs(save_folder)

@@ -435,8 +435,9 @@ HUN_200 = [['HUN', 6, 4, list_200], ['HUN', 6, 6, list_200],
           ['HUN', 8, 4, list_200], ['HUN', 8, 6, list_200], ]  # 1000
 
 # dispatching rules ######################################################################################
-# all_rules = ['LTT', 'MOR', 'FDD/MWKR', 'LRPT', 'SPT', 'STT', 'SRPT', 'LOR', 'LPT']
-all_rules = ['LTT', 'MOR', 'FDD/MWKR', 'LRPT', 'SPT']
+all_rules = ['LTT', 'MOR', 'FDD/MWKR', 'LRPT', 'SPT', 'STT', 'SRPT', 'LOR', 'LPT', 'FIFO']
+rules_5 = ['LTT', 'MOR', 'FDD/MWKR', 'LRPT', 'SPT']
+rules_3 = ['LTT', 'MOR', 'FDD/MWKR']
 
 # action_types = ['conflict', 'buffer', 'buffer_being']
 action_types = ['conflict', 'buffer']
