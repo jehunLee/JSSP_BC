@@ -194,11 +194,9 @@ class AgentGNN():
         return model_path
 
     def get_model_name(self) -> str:
-        # model_name = f'{configs.model_type}_{configs.model_global_type} {configs.hi_dim}' \
-        #              f' {configs.loss_type} {configs.lr} {configs.dropout_p} {configs.batch_size}' \
-        #              f' {configs.softmax_tau} {configs.L2_norm_w} {configs.optimizer_type} {configs.attn_head_n}' \
-        #              f' {configs.scheduler_type} {configs.max_ep_n} {configs.training_len} {self.model_i}'
         model_name = 'best'
+        # if 'multi_model' in configs.beam_type:
+        #     model_name = f'best_{self.model_i}'
         return model_name
 
     def model_save(self) -> None:

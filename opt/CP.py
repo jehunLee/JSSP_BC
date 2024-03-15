@@ -132,11 +132,10 @@ def result_save(save_path: str, benchmark: str, job_n: int, mc_n: int, instance_
 if __name__ == "__main__":
     from utils import all_benchmarks
     save_path = None
-    obj_type = 'total_completion'
+    obj_type = 'makespan'
     # save_path = './../result/bench_cp.csv'
     for time_limit in [3600]:  # 1, 10, 60, 300, 3600
-        for (benchmark, job_n, mc_n, save_is) in [('HUN', 6, 4, list(range(300))), ('HUN', 6, 6, list(range(300))),
-                                                   ('HUN', 8, 4, list(range(300))), ('HUN', 8, 6, list(range(300)))]:
+        for (benchmark, job_n, mc_n, save_is) in [('HUN', 5, 2, [0])]:
         # for (benchmark, job_n, mc_n, save_i_n) in all_benchmarks:
             print(benchmark, job_n, mc_n)
 

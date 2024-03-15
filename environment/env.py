@@ -10,7 +10,6 @@ from torch_geometric.loader import DataLoader  # https://github.com/pyg-team/pyt
 
 class JobShopEnv:
     def __init__(self, problems: list=[], pomo_n: int=1, load_envs=None):
-        self.M = 1e4
         self.pomo_n = pomo_n
 
         if load_envs:
@@ -32,9 +31,11 @@ class JobShopEnv:
             self.load_problems(problems)
             self.init_index()
 
-        UB = self.init_job_durations.max() * self.max_mc_n * self.max_job_n * self.max_mc_n
-        while UB > self.M:
-            self.M *= 10
+            # etc #########################################################################
+            self.M = 1e4
+            UB = self.init_job_durations.max() * self.max_mc_n * self.max_job_n * self.max_mc_n
+            while UB > self.M:
+                self.M *= 10
 
     def load(self, envs) -> (dict, list):
         # environment ################################################################
@@ -46,17 +47,20 @@ class JobShopEnv:
         self.op_n = envs[0].op_n
         self.op_map = envs[0].op_map
 
+        self.init_job_durations = envs[0].init_job_durations
+        self.M = envs[0].M
+
         # static #####################################################################
         self.job_durations = envs[0].job_durations.repeat(self.env_n, self.pomo_n, 1, 1)
         self.job_mcs = envs[0].job_mcs.repeat(self.env_n, self.pomo_n, 1, 1)
-        self.job_step_n = envs[0].job_step_n.repeat(self.env_n, self.pomo_n, 1)
-        self.init_job_step_n = envs[0].init_job_step_n.repeat(self.env_n, 1, 1)
+        self.op_mcs = envs[0].op_mcs.repeat(self.env_n, self.pomo_n, 1)
 
         self.job_tails = envs[0].job_tails.repeat(self.env_n, self.pomo_n, 1, 1)
         self.job_tail_ns = envs[0].job_tail_ns.repeat(self.env_n, self.pomo_n, 1, 1)
         self.job_flow_due_date = envs[0].job_flow_due_date.repeat(self.env_n, self.pomo_n, 1, 1)
 
-        self.op_mcs = envs[0].op_mcs.repeat(self.env_n, self.pomo_n, 1)
+        self.job_step_n = envs[0].job_step_n.repeat(self.env_n, self.pomo_n, 1)
+        self.init_job_step_n = envs[0].init_job_step_n.repeat(self.env_n, 1, 1)
 
         # dynamic #####################################################################
         self.job_last_step = torch.cat([env.job_last_step for env in envs], dim=0).repeat(
@@ -68,7 +72,10 @@ class JobShopEnv:
             1, self.pomo_n, 1, 1)
         self.job_ready_t_mc_gap = torch.cat([env.job_ready_t_mc_gap for env in envs], dim=0).repeat(
             1, self.pomo_n, 1, 1)
+
         self.job_done_t = torch.cat([env.job_done_t for env in envs], dim=0).repeat(
+            1, self.pomo_n, 1, 1)
+        self.job_arrival_t_ = torch.cat([env.job_arrival_t_ for env in envs], dim=0).repeat(
             1, self.pomo_n, 1, 1)
 
         self.mc_last_job = torch.cat([env.mc_last_job for env in envs], dim=0).repeat(
@@ -78,6 +85,8 @@ class JobShopEnv:
 
         self.decision_n = torch.cat([env.decision_n for env in envs], dim=0).repeat(
             1, self.pomo_n)
+        self.reserved = defaultdict(list)
+
         self.target_mc = torch.cat([env.target_mc for env in envs], dim=0).repeat(
             1, self.pomo_n, 1)
         self.op_mask = torch.cat([env.op_mask for env in envs], dim=0).repeat(
@@ -94,9 +103,6 @@ class JobShopEnv:
             self.e_all_pred = defaultdict()
             self.e_all_succ = defaultdict()
             self.e_disj = defaultdict()
-
-            # self.reserved_e_disj = defaultdict()
-            self.reserved = defaultdict()
 
             for i in range(self.env_n):
                 self.e_pred[i] = envs[i].e_pred[0]
@@ -277,6 +283,7 @@ class JobShopEnv:
         self.mc_last_job_step = torch.zeros(self.env_n, self.pomo_n, self.max_mc_n, dtype=torch.long)
 
         self.decision_n = torch.zeros(self.env_n, self.pomo_n, dtype=torch.long)
+        self.reserved = defaultdict(list)
 
     def reset(self):
         self.reset_idxs()
@@ -790,7 +797,7 @@ class JobShopEnv:
         # tie: FIFO -> SPT
         index_FIFO = -features[self.ENV_IDX_O, self.POMO_IDX_O, self.OP_IDX, 5]
         index_SPT = -features[self.ENV_IDX_O, self.POMO_IDX_O, self.OP_IDX, 0]
-        index += index_FIFO / self.M + index_SPT / self.M / self.M
+        index += index_SPT / self.M + index_FIFO / self.M / self.M
 
         return self.get_assign_job(index.argmax(dim=2))
 
@@ -925,9 +932,9 @@ if __name__ == "__main__":
     save_folder = f'./../result/'
     if not os.path.exists(save_folder):
         os.makedirs(save_folder)
-    save_path = save_folder + f'result_rule_flow.csv'
+    save_path = save_folder + f'result_rule_real_d.csv'
 
-    for (benchmark, job_n, mc_n, instances) in all_benchmarks:
+    for (benchmark, job_n, mc_n, instances) in REAL_D:
         print(benchmark, job_n, mc_n, instances)
         for i in tqdm(instances):
             envs_info = [(benchmark, job_n, mc_n, i)]
