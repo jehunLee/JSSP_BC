@@ -12,31 +12,7 @@ class JobShopGenEnv(JobShopEnv):
         super().__init__(problems, pomo_n, load_envs)
 
     def reset(self):
-        # static ##########################################
-        self.job_durations = self.init_job_durations.unsqueeze(dim=1).expand(-1, self.pomo_n, -1, -1)
-        self.job_mcs = self.init_job_mcs.unsqueeze(dim=1).expand(-1, self.pomo_n, -1, -1)
-        self.op_mcs = self.job_mcs[:, :, :-1, :-1].reshape(self.env_n, self.pomo_n, -1)
-
-        self.job_tails = self.init_job_tails.unsqueeze(dim=1).expand(-1, self.pomo_n, -1, -1)
-        self.job_tail_ns = self.init_job_tail_ns.unsqueeze(dim=1).expand(-1, self.pomo_n, -1, -1)
-        self.job_flow_due_date = self.init_job_flow_due_date.unsqueeze(dim=1).expand(-1, self.pomo_n, -1, -1)
-
-        self.job_step_n = self.init_job_step_n.unsqueeze(dim=1).expand(-1, self.pomo_n, -1)
-
-        # dynamic #########################################
-        self.job_last_step = torch.zeros(self.env_n, self.pomo_n, self.max_job_n+1, dtype=torch.long)
-
-        self.job_ready_t = self.init_job_ready.unsqueeze(dim=1).expand(-1, self.pomo_n, -1, -1)
-        self.job_ready_t_precedence = self.init_job_ready.unsqueeze(dim=1).expand(-1, self.pomo_n, -1, -1).clone()
-        self.job_ready_t_mc_gap = torch.zeros(self.env_n, self.pomo_n, self.max_job_n+1, self.max_mc_n+1,
-                                              dtype=torch.long)
-        self.job_done_t = self.init_job_done.unsqueeze(dim=1).expand(-1, self.pomo_n, -1, -1)
-        self.job_arrival_t = self.init_job_arrival.unsqueeze(dim=1).expand(-1, self.pomo_n, -1)
-
-        self.mc_last_job = torch.full(size=(self.env_n, self.pomo_n, self.max_mc_n), fill_value=self.max_job_n)
-        self.mc_last_job_step = torch.zeros(self.env_n, self.pomo_n, self.max_mc_n, dtype=torch.long)
-
-        self.decision_n = torch.zeros(self.env_n, self.pomo_n, dtype=torch.long)
+        self.reset_idxs()
 
         if 'rule' not in configs.agent_type:
             self.init_disj_info()
