@@ -10,7 +10,7 @@ from torch_geometric.loader import DataLoader  # https://github.com/pyg-team/pyt
 
 class JobShopEnv:
     def __init__(self, problems: list=[], pomo_n: int=1, load_envs=None):
-        self.M = 1e4
+        self.M = 1e6
         self.pomo_n = pomo_n
 
         if load_envs:
