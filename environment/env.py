@@ -45,7 +45,7 @@ class JobShopEnv:
         self.max_mc_n = envs[0].max_mc_n
 
         self.op_n = envs[0].op_n
-        self.op_map = envs[0].op_map
+        self.op_map = envs[0].op_map.expand(self.env_n, -1, -1)
 
         self.init_job_durations = envs[0].init_job_durations
         self.M = envs[0].M
@@ -76,7 +76,7 @@ class JobShopEnv:
         self.job_done_t = torch.cat([env.job_done_t for env in envs], dim=0).repeat(
             1, self.pomo_n, 1, 1)
         self.job_arrival_t_ = torch.cat([env.job_arrival_t_ for env in envs], dim=0).repeat(
-            1, self.pomo_n, 1, 1)
+            1, self.pomo_n, 1)
 
         self.mc_last_job = torch.cat([env.mc_last_job for env in envs], dim=0).repeat(
             1, self.pomo_n, 1)
