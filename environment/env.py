@@ -304,6 +304,7 @@ class JobShopEnv:
 
     def step(self, a):
         if 'rule' in configs.agent_type:
+            a = self.get_assign_job(a)
             self.assign(a)
         elif self.pomo_n > 1:
             a = self.get_assign_job(torch.concat(a).to('cpu').view(
@@ -799,7 +800,7 @@ class JobShopEnv:
         index_SPT = -features[self.ENV_IDX_O, self.POMO_IDX_O, self.OP_IDX, 0]
         index += index_SPT / self.M + index_FIFO / self.M / self.M
 
-        return self.get_assign_job(index.argmax(dim=2))
+        return index.argmax(dim=2)
 
     def get_assign_job(self, selected_index):
         assign_job = F.one_hot(selected_index, num_classes=self.op_n).view(
