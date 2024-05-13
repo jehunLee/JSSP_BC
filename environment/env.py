@@ -50,15 +50,6 @@ class JobShopEnv:
         self.init_job_durations = envs[0].init_job_durations
         self.M = envs[0].M
 
-        # dyn ########################################################################
-        if 'mc_breakdown' in configs.dyn_type:
-            if 'known' in configs.dyn_type:
-                self.init_mc_break = envs[0].init_mc_break
-                self.init_mc_repair = envs[0].init_mc_repair
-
-                self.mc_break = envs[0].mc_break.repeat(self.env_n, self.pomo_n, 1)
-                self.mc_repair = envs[0].mc_repair.repeat(self.env_n, self.pomo_n, 1)
-
         # static #####################################################################
         self.job_durations = envs[0].job_durations.repeat(self.env_n, self.pomo_n, 1, 1)
         self.job_mcs = envs[0].job_mcs.repeat(self.env_n, self.pomo_n, 1, 1)
@@ -194,15 +185,6 @@ class JobShopEnv:
                             self.init_e_disj[i].append((op2, op))
                         self.init_mc_ops[i][m].append(op)
 
-        if 'mc_breakdown' in configs.dyn_type:
-            # for i, (_, _, mc_n, _) in enumerate(problems):
-            #     for k in range(mc_n):
-            #         self.init_events[i].append((configs.parameter * k, 'mc_breakdown', k, configs.parameter * (k + 1)))
-
-            if 'known' in configs.dyn_type:
-                self.init_mc_break = torch.zeros(self.env_n, self.max_mc_n, dtype=torch.long)
-                self.init_mc_repair = torch.zeros(self.env_n, self.max_mc_n, dtype=torch.long)
-
     def init_index(self):
         self.ENV_IDX_J = torch.arange(self.env_n, dtype=torch.long)[:, None, None].expand(
             -1, self.pomo_n, self.max_job_n+1)
@@ -308,10 +290,6 @@ class JobShopEnv:
 
         if 'rule' not in configs.agent_type:
             self.init_disj_info()
-
-        if 'mc_breakdown' in configs.dyn_type and 'known' in configs.dyn_type:
-            self.mc_break = self.init_mc_break.unsqueeze(dim=1).expand(-1, self.pomo_n, -1)
-            self.mc_repair = self.init_mc_repair.unsqueeze(dim=1).expand(-1, self.pomo_n, -1)
 
         ##################################################
         self.next_state()
@@ -751,49 +729,22 @@ class JobShopEnv:
         # makespan ##############
         max_done_t = self.job_done_t[self.ENV_IDX_J, self.POMO_IDX_J, self.JOB_IDX, self.job_step_n-1].max(dim=2)[0]
 
-        mc_load = self.get_mc_LB(max_done_t)
-
         # total_complete_t ##############
-        # done_t = (self.job_done_t[self.ENV_IDX_J, self.POMO_IDX_J, self.JOB_IDX, self.job_step_n-1] -
-        #           self.job_arrival_t_)[:, :, :-1]
-        # total_c_t = done_t.sum(dim=2)
+        done_t = (self.job_done_t[self.ENV_IDX_J, self.POMO_IDX_J, self.JOB_IDX, self.job_step_n-1] -
+                  self.job_arrival_t_)[:, :, :-1]
+        total_c_t = done_t.sum(dim=2)
 
-        return torch.where(max_done_t >= mc_load, max_done_t, mc_load)
+        # mc LB ##############
+        # mc_t = self.job_done_t[self.ENV_IDX_M, self.POMO_IDX_M, self.mc_last_job, self.mc_last_job_step]
+        # last_step = self.job_last_step.view(self.env_n, self.pomo_n, self.max_job_n + 1, -1).expand(
+        #     -1, -1, -1, self.max_mc_n + 1)
+        # prt = torch.where(last_step <= self.JOB_STEP_IDX, self.job_durations, 0)[:, :, :-1, :-1].reshape(
+        #     self.env_n, self.pomo_n, -1)  # assigned job 만 prt 유지
+        # mc_load = torch.zeros(self.env_n, self.pomo_n, self.max_mc_n, dtype=torch.long)
+        # mc_load.scatter_add_(2, index=self.job_mcs[:, :, :-1, :-1].reshape(self.env_n, self.pomo_n, -1), src=prt)
 
-    def get_mc_LB(self, max_done_t):
-        if 'dyn' in configs.env_type:
-            curr_t_ = self.curr_t.view(self.env_n, self.pomo_n, 1, -1).expand(-1, -1, self.max_job_n, self.max_mc_n)
-
-            remain_done = self.job_done_t[:, :, :-1, :-1] - curr_t_
-            prt = self.job_durations[:, :, :-1, :-1]
-            prt = torch.where(remain_done < prt, remain_done, prt).reshape(self.env_n, self.pomo_n, -1)
-        else:
-            prt = self.job_durations[:, :, :-1, :-1].reshape(self.env_n, self.pomo_n, -1)
-
-        prt = torch.where(prt > 0, prt, 0)
-        mc_load = torch.zeros(self.env_n, self.pomo_n, self.max_mc_n)
-        mc_load.scatter_add_(2, index=self.job_mcs[:, :, :-1, :-1].reshape(self.env_n, self.pomo_n, -1), src=prt)
-
-        # earliest start time of mc
-        remain_s_t = self.job_ready_t - self.curr_t[:, :, None, None].expand(
-            self.env_n, self.pomo_n, self.max_job_n+1, self.max_mc_n+1)
-        remain_s_t = torch.where(remain_s_t > 0, remain_s_t, 0).unsqueeze(dim=2).expand(
-            -1, -1, self.max_mc_n, -1, -1)
-
-        IDX = torch.arange(self.max_mc_n, dtype=torch.long)[None, None, :, None, None].expand(
-            self.env_n, self.pomo_n, -1, self.max_job_n+1, self.max_mc_n+1)
-
-        job_mcs = self.job_mcs.unsqueeze(dim=2).expand(-1, -1, self.max_mc_n, -1, -1)
-
-        mc_s_t = torch.where(job_mcs == IDX, remain_s_t, 0)[:, :, :, :-1, :-1].sum(dim=4)
-        mc_s_t = mc_s_t.min(dim=3)[0]
-
-        mc_load = mc_s_t + mc_load + self.curr_t[:, :, None].expand(self.env_n, self.pomo_n, self.max_mc_n)
-
-        mc_load_ = mc_load.max(dim=2)[0]
-        mc_load_ = torch.where(mc_load_ >= self.M, 0, mc_load_)
-
-        return mc_load_
+        # return torch.stack((max_done_t, (mc_t+mc_load).max(dim=2)[0]), dim=2).max(dim=2)[0]
+        return max_done_t
 
     def done(self):
         finished = (self.job_last_step == self.job_step_n).all(dim=2)  # (env_n, pomo_n)
