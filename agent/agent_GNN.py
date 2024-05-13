@@ -152,7 +152,7 @@ class AgentGNN():
         else:
             optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=configs.L2_norm_w)
         return optimizer
-
+    
     def get_scheduler(self, optimizer=None, lr=None, scheduler_type=None):
         if not optimizer:
             optimizer = self.optimizer
@@ -255,7 +255,6 @@ class AgentGNN():
             while not done:
                 a, a_, log_p = self.get_action_sample(obs, model=model)
                 obs_, reward, done = env.step(a)
-
                 obs = obs_
         else:
             model.eval()

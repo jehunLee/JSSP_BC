@@ -18,10 +18,11 @@ class AgentBC(AgentGNN):
         """
         update weight of model
         """
-        model.train()  # (dropout=True)
         optimizer.zero_grad()
-
+        
+        model.train()  # (dropout=True)
         loss = model.loss(batch)
+        
         loss.backward()
         clip_grad_norm_(model.parameters(), configs.max_grad_norm)
 
@@ -52,8 +53,6 @@ class AgentBC(AgentGNN):
             total_loss = 0
             for batch in loader:
                 loss = self.update_BC(batch, self.model, self.optimizer)
-                # if loss.isnan().item():
-                #     print('error: loss nan')
                 total_loss += loss.item()
 
             losses.append(round(total_loss, 4))
@@ -78,7 +77,7 @@ class AgentBC(AgentGNN):
                       f'\tbest valid mean_cum_r: {max(valids)} \tlearning rate: {self.get_current_lr()}')
 
                 self.save_training_process(valids, losses)
-                # self.training_process_fig(valids, losses, save_TF=False)
+                self.training_process_fig(valids, losses, save_TF=False)
 
         # save result #############################################################
         self.save_training_process(valids, losses)
@@ -94,7 +93,6 @@ if __name__ == '__main__':
     configs.env_type = 'dyn'  # 'dyn', ''
     configs.state_type = 'mc_gap_mc_load_prt_norm'  # 'basic_norm', 'simple_norm', 'norm', 'mc_load_norm'
     configs.model_type = 'type_all_pred_GAT2'  # 'type_all_pred_GAT2'
-    # configs.model_type = 'type_all_pred_GAT2'  # 'type_all_pred_GAT2'
 
     valid_problem_set = [('TA', 15, 15, list(range(10)))]
 
